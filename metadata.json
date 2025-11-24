@@ -1,0 +1,8 @@
+{
+  "name": "SmartHealth AI",
+  "description": "A comprehensive AI-powered healthcare portal for patients and doctors featuring smart diagnosis assistance, voice prescriptions, and emergency response.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
