@@ -53,6 +53,71 @@ export async function registerPatient(input: RegisterPatientInput) {
   }
 }
 
+const PROFILE_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  phone: true,
+  createdAt: true,
+  patient: true,
+} as const;
+
+export async function getPatientProfile(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: PROFILE_SELECT,
+  });
+
+  if (!user || user.role !== "patient") return null;
+  return user;
+}
+
+interface UpdatePatientInput {
+  name?: string;
+  phone?: string | null;
+  age?: number;
+  gender?: Gender;
+  bloodGroup?: string | null;
+  address?: string | null;
+  allergies?: string[];
+  chronicConditions?: string[];
+}
+
+export async function updatePatientProfile(userId: string, input: UpdatePatientInput) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { patient: true },
+  });
+
+  if (!user || user.role !== "patient" || !user.patient) {
+    throw new Error("Patient not found");
+  }
+
+  const { name, phone, ...patientFields } = input;
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(name !== undefined && { name }),
+      ...(phone !== undefined && { phone }),
+      patient: {
+        update: {
+          ...(patientFields.age !== undefined && { age: patientFields.age }),
+          ...(patientFields.gender !== undefined && { gender: patientFields.gender }),
+          ...(patientFields.bloodGroup !== undefined && { bloodGroup: patientFields.bloodGroup }),
+          ...(patientFields.address !== undefined && { address: patientFields.address }),
+          ...(patientFields.allergies !== undefined && { allergies: patientFields.allergies }),
+          ...(patientFields.chronicConditions !== undefined && { chronicConditions: patientFields.chronicConditions }),
+        },
+      },
+    },
+    select: PROFILE_SELECT,
+  });
+
+  return updated;
+}
+
 export async function loginPatient(email: string, password: string) {
   const user = await prisma.user.findUnique({
     where: { email },

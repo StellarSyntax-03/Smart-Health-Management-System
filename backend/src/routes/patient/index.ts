@@ -1,9 +1,7 @@
 import { Router, Request, Response } from "express";
-import { registerPatient, loginPatient } from "../../services/patientService.js";
+import { registerPatient, loginPatient, getPatientProfile, updatePatientProfile } from "../../services/patientService.js";
 import { generateToken } from "../../services/auth.js";
 import { authenticate, authorize, AuthRequest } from "../../middleware/auth.js";
-import prisma from "../../config/database.js";
-
 const router = Router();
 
 const EXPECTED_ERRORS = ["Email already registered", "Invalid email or password"];
@@ -101,18 +99,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
 router.get("/profile", authenticate, authorize("patient"), async (req: AuthRequest, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        phone: true,
-        createdAt: true,
-        patient: true,
-      },
-    });
+    const user = await getPatientProfile(req.user!.userId);
 
     if (!user) {
       res.status(404).json({ error: "Patient not found" });
@@ -122,6 +109,58 @@ router.get("/profile", authenticate, authorize("patient"), async (req: AuthReque
     res.json({ success: true, data: user });
   } catch {
     res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+router.put("/profile", authenticate, authorize("patient"), async (req: AuthRequest, res: Response) => {
+  const { name, phone, age, gender, bloodGroup, address, allergies, chronicConditions } = req.body;
+
+  if (age !== undefined) {
+    const parsedAge = Number(age);
+    if (!Number.isFinite(parsedAge) || parsedAge < 0 || parsedAge > 150 || !Number.isInteger(parsedAge)) {
+      res.status(400).json({ error: "Age must be a valid integer between 0 and 150" });
+      return;
+    }
+  }
+
+  if (gender !== undefined) {
+    const validGenders = ["male", "female", "other"];
+    if (!validGenders.includes(gender)) {
+      res.status(400).json({ error: "Gender must be male, female, or other" });
+      return;
+    }
+  }
+
+  if (allergies !== undefined && (!Array.isArray(allergies) || !allergies.every((a: unknown) => typeof a === "string"))) {
+    res.status(400).json({ error: "Allergies must be an array of strings" });
+    return;
+  }
+
+  if (chronicConditions !== undefined && (!Array.isArray(chronicConditions) || !chronicConditions.every((c: unknown) => typeof c === "string"))) {
+    res.status(400).json({ error: "Chronic conditions must be an array of strings" });
+    return;
+  }
+
+  try {
+    const updated = await updatePatientProfile(req.user!.userId, {
+      name,
+      phone,
+      age: age !== undefined ? Number(age) : undefined,
+      gender,
+      bloodGroup,
+      address,
+      allergies,
+      chronicConditions,
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "Patient not found") {
+      res.status(404).json({ error: message });
+    } else {
+      res.status(500).json({ error: "Failed to update profile" });
+    }
   }
 });
 
