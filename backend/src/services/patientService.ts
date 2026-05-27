@@ -1,0 +1,73 @@
+import prisma from "../config/database.js";
+import { hashPassword, comparePassword } from "./auth.js";
+import { Gender } from "../generated/prisma/client.js";
+
+interface RegisterPatientInput {
+  email: string;
+  password: string;
+  name: string;
+  phone?: string;
+  age: number;
+  gender: Gender;
+  bloodGroup?: string;
+  address?: string;
+  allergies?: string[];
+  chronicConditions?: string[];
+}
+
+export async function registerPatient(input: RegisterPatientInput) {
+  const hashedPassword = await hashPassword(input.password);
+
+  try {
+    const user = await prisma.user.create({
+      data: {
+        email: input.email,
+        password: hashedPassword,
+        name: input.name,
+        role: "patient",
+        phone: input.phone,
+        patient: {
+          create: {
+            age: input.age,
+            gender: input.gender,
+            bloodGroup: input.bloodGroup,
+            address: input.address,
+            allergies: input.allergies || [],
+            chronicConditions: input.chronicConditions || [],
+          },
+        },
+      },
+      include: { patient: true },
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  } catch (err: unknown) {
+    if (
+      typeof err === "object" && err !== null && "code" in err &&
+      (err as { code: string }).code === "P2002"
+    ) {
+      throw new Error("Email already registered", { cause: err });
+    }
+    throw new Error("Registration failed", { cause: err });
+  }
+}
+
+export async function loginPatient(email: string, password: string) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { patient: true },
+  });
+
+  if (!user || user.role !== "patient") {
+    throw new Error("Invalid email or password");
+  }
+
+  const valid = await comparePassword(password, user.password);
+  if (!valid) {
+    throw new Error("Invalid email or password");
+  }
+
+  const { password: _, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+}
