@@ -2,11 +2,15 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, FormEvent, Suspense } from "react";
-import { Activity } from "lucide-react";
+import { Activity, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/context/auth";
 
 function LoginForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { login } = useAuth();
+
   const VALID_ROLES = ["patient", "doctor"] as const;
   const rawRole = searchParams.get("role");
   const role = VALID_ROLES.includes(rawRole as typeof VALID_ROLES[number])
@@ -15,14 +19,24 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const isPatient = role === "patient";
   const title = isPatient ? "Patient Login" : "Doctor Login";
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    // TODO: Wire to auth API in T-007
-    router.push(`/${role}`);
+    setError("");
+    setSubmitting(true);
+    try {
+      await login(email, password, role);
+      router.push(`/${role}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -35,6 +49,12 @@ function LoginForm() {
           <h1 className="text-xl font-bold text-slate-900">{title}</h1>
           <p className="text-sm text-slate-500">Sign in to SmartHealth AI</p>
         </div>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -69,16 +89,22 @@ function LoginForm() {
 
           <button
             type="submit"
-            className={`w-full text-white py-2.5 rounded-lg font-medium transition-colors text-sm ${isPatient ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
+            disabled={submitting}
+            className={`w-full text-white py-2.5 rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2 ${isPatient ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700"} disabled:opacity-60`}
           >
-            Sign In
+            {submitting && <Loader2 size={16} className="animate-spin" />}
+            {submitting ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-500">
-          Don&apos;t have an account?{" "}
-          <span className="text-slate-400 cursor-not-allowed">Sign Up (coming soon)</span>
-        </p>
+        {isPatient && (
+          <p className="text-center text-sm text-slate-500">
+            Don&apos;t have an account?{" "}
+            <Link href="/register?role=patient" className="text-blue-600 hover:underline font-medium">
+              Sign Up
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );

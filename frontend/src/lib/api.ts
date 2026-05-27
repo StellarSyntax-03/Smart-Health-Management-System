@@ -1,10 +1,18 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+const TOKEN_KEY = "smarthealth_token";
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const { headers: customHeaders, ...restOptions } = options || {};
   const normalizedHeaders = new Headers(customHeaders);
   if (!normalizedHeaders.has("Content-Type")) {
     normalizedHeaders.set("Content-Type", "application/json");
+  }
+
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token && !normalizedHeaders.has("Authorization")) {
+      normalizedHeaders.set("Authorization", `Bearer ${token}`);
+    }
   }
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
