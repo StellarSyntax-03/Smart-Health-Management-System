@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  patient
+  doctor
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum ReportType {
+  pdf
+  image
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patient Patient?
+  doctor  Doctor?
+
+  @@map("users")
+}
+
+model Patient {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  age               Int
+  gender            Gender
+  bloodGroup        String?
+  address           String?
+  allergies         String[] @default([])
+  chronicConditions String[] @default([])
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prescriptions Prescription[]
+  reports       MedicalReport[]
+  records       MedicalRecord[]
+  vitals        Vital[]
+  chatSessions  ChatSession[]
+  sosAlerts     SOSAlert[]
+
+  @@map("patients")
+}
+
+model Doctor {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  specialization String?
+  licenseNumber  String?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prescriptions Prescription[]
+
+  @@map("doctors")
+}
+
+model MedicalRecord {
+  id        String   @id @default(cuid())
+  patientId String
+  date      DateTime
+  condition String
+  notes     String?
+  type      String
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("medical_records")
+}
+
+model Prescription {
+  id          String       @id @default(cuid())
+  patientId   String
+  doctorId    String?
+  date        DateTime     @default(now())
+  notes       String?
+  medications Medication[]
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  Doctor? @relation(fields: [doctorId], references: [id])
+
+  @@map("prescriptions")
+}
+
+model Medication {
+  id             String @id @default(cuid())
+  prescriptionId String
+  name           String
+  dosage         String
+  frequency      String
+  duration       String
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@map("medications")
+}
+
+model MedicalReport {
+  id        String     @id @default(cuid())
+  patientId String
+  name      String
+  date      DateTime   @default(now())
+  type      ReportType
+  url       String
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("medical_reports")
+}
+
+model Vital {
+  id          String   @id @default(cuid())
+  patientId   String
+  type        String
+  value       String
+  unit        String
+  recordedAt  DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("vitals")
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  patientId String
+  createdAt DateTime      @default(now())
+  messages  ChatMessage[]
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String
+  text      String
+  createdAt DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model SOSAlert {
+  id        String   @id @default(cuid())
+  patientId String
+  latitude  Float?
+  longitude Float?
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("sos_alerts")
+}

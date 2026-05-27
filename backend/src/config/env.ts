@@ -14,11 +14,15 @@ export const env = {
   PORT: parsePort(process.env.PORT, 5001),
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
+  DATABASE_URL: process.env.DATABASE_URL || "",
   NODE_ENV: process.env.NODE_ENV || "development",
 } as const;
 
 export function validateEnv(): void {
   if (!env.GEMINI_API_KEY) {
     console.warn("WARNING: GEMINI_API_KEY is not set. AI features will not work.");
+  }
+  if (!env.DATABASE_URL) {
+    console.warn("WARNING: DATABASE_URL is not set. Database features will not work.");
   }
 }
