@@ -86,12 +86,15 @@ model MedicalRecord {
 }
 
 model Prescription {
-  id          String       @id @default(cuid())
-  patientId   String
-  doctorId    String?
-  date        DateTime     @default(now())
-  notes       String?
-  medications Medication[]
+  id           String       @id @default(cuid())
+  patientId    String
+  doctorId     String?
+  date         DateTime     @default(now())
+  notes        String?
+  fileUrl      String?
+  fileName     String?
+  filePublicId String?
+  medications  Medication[]
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor  Doctor? @relation(fields: [doctorId], references: [id])
