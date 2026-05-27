@@ -33,7 +33,19 @@ router.post("/", uploadSingle, async (req: AuthRequest, res: Response) => {
   let medications: { name: string; dosage: string; frequency: string; duration: string }[] | undefined;
   if (req.body.medications) {
     try {
-      medications = JSON.parse(req.body.medications);
+      const parsed = JSON.parse(req.body.medications);
+      if (!Array.isArray(parsed)) {
+        res.status(400).json({ error: "Medications must be a JSON array" });
+        return;
+      }
+      const requiredKeys = ["name", "dosage", "frequency", "duration"] as const;
+      for (const med of parsed) {
+        if (typeof med !== "object" || med === null || requiredKeys.some((k) => typeof med[k] !== "string")) {
+          res.status(400).json({ error: "Each medication must have name, dosage, frequency, and duration as strings" });
+          return;
+        }
+      }
+      medications = parsed;
     } catch {
       res.status(400).json({ error: "Medications must be a valid JSON array" });
       return;

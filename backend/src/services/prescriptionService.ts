@@ -18,21 +18,26 @@ export async function createPrescription(input: CreatePrescriptionInput) {
     resourceType,
   );
 
-  return prisma.prescription.create({
-    data: {
-      patientId: input.patientId,
-      notes: input.notes,
-      fileUrl: secureUrl,
-      fileName: input.file.originalname,
-      filePublicId: publicId,
-      ...(input.medications?.length && {
-        medications: {
-          create: input.medications,
-        },
-      }),
-    },
-    include: { medications: true },
-  });
+  try {
+    return await prisma.prescription.create({
+      data: {
+        patientId: input.patientId,
+        notes: input.notes,
+        fileUrl: secureUrl,
+        fileName: input.file.originalname,
+        filePublicId: publicId,
+        ...(input.medications?.length && {
+          medications: {
+            create: input.medications,
+          },
+        }),
+      },
+      include: { medications: true },
+    });
+  } catch (err) {
+    await deleteFile(publicId, resourceType).catch(() => {});
+    throw err;
+  }
 }
 
 export async function listPrescriptions(patientId: string) {
