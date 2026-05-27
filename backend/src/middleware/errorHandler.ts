@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import multer from "multer";
 import { env } from "../config/env.js";
 
 export function errorHandler(
@@ -9,6 +10,16 @@ export function errorHandler(
 ): void {
   if (res.headersSent) {
     next(err);
+    return;
+  }
+
+  if (err instanceof multer.MulterError) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof Error && err.message.startsWith("Invalid file type")) {
+    res.status(400).json({ error: err.message });
     return;
   }
 

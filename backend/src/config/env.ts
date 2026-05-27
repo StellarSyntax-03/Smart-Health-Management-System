@@ -18,6 +18,9 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET || "dev-secret-change-in-production",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
   NODE_ENV: process.env.NODE_ENV || "development",
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "",
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || "",
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || "",
 } as const;
 
 export function validateEnv(): void {
@@ -26,6 +29,9 @@ export function validateEnv(): void {
   }
   if (!env.DATABASE_URL) {
     console.warn("WARNING: DATABASE_URL is not set. Database features will not work.");
+  }
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+    console.warn("WARNING: Cloudinary credentials not fully set. File uploads will not work.");
   }
   if (!process.env.JWT_SECRET) {
     if (env.NODE_ENV === "production") {

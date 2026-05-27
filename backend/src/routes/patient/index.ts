@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { registerPatient, loginPatient, getPatientProfile, updatePatientProfile } from "../../services/patientService.js";
 import { generateToken } from "../../services/auth.js";
 import { authenticate, authorize, AuthRequest } from "../../middleware/auth.js";
+import prescriptionRoutes from "./prescriptions.js";
 const router = Router();
 
 const EXPECTED_ERRORS = ["Email already registered", "Invalid email or password"];
@@ -163,5 +164,7 @@ router.put("/profile", authenticate, authorize("patient"), async (req: AuthReque
     }
   }
 });
+
+router.use("/prescriptions", prescriptionRoutes);
 
 export default router;
