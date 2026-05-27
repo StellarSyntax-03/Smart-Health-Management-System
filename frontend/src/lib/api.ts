@@ -2,17 +2,23 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const { headers: customHeaders, ...restOptions } = options || {};
+  const normalizedHeaders = new Headers(customHeaders);
+  if (!normalizedHeaders.has("Content-Type")) {
+    normalizedHeaders.set("Content-Type", "application/json");
+  }
+
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...restOptions,
-    headers: {
-      "Content-Type": "application/json",
-      ...customHeaders,
-    },
+    headers: normalizedHeaders,
   });
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Request failed" }));
     throw new Error(error.error || `HTTP ${res.status}`);
+  }
+
+  if (res.status === 204 || res.headers.get("Content-Length") === "0") {
+    return undefined as T;
   }
 
   return res.json();

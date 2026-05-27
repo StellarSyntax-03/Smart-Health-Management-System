@@ -7,7 +7,11 @@ import { Activity } from "lucide-react";
 function LoginForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const role = searchParams.get("role") || "patient";
+  const VALID_ROLES = ["patient", "doctor"] as const;
+  const rawRole = searchParams.get("role");
+  const role = VALID_ROLES.includes(rawRole as typeof VALID_ROLES[number])
+    ? (rawRole as typeof VALID_ROLES[number])
+    : "patient";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
