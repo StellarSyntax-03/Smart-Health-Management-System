@@ -22,7 +22,11 @@ app.use("/api/doctor", doctorRoutes);
 app.use("/api/ai", aiRoutes);
 
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", environment: env.NODE_ENV, timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    ...(env.NODE_ENV === "development" && { environment: env.NODE_ENV }),
+  });
 });
 
 app.use(notFound);

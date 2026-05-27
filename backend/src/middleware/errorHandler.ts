@@ -2,15 +2,21 @@ import { Request, Response, NextFunction } from "express";
 import { env } from "../config/env.js";
 
 export function errorHandler(
-  err: Error,
+  err: unknown,
   _req: Request,
   res: Response,
-  _next: NextFunction
+  next: NextFunction
 ): void {
-  console.error(`[Error] ${err.message}`);
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+
+  const message = err instanceof Error ? err.message : "Unknown error";
+  console.error(`[Error] ${message}`);
 
   res.status(500).json({
     error: "Internal server error",
-    ...(env.NODE_ENV === "development" && { message: err.message }),
+    ...(env.NODE_ENV === "development" && { message }),
   });
 }
