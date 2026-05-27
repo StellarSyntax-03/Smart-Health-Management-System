@@ -4,7 +4,7 @@ const TOKEN_KEY = "smarthealth_token";
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const { headers: customHeaders, ...restOptions } = options || {};
   const normalizedHeaders = new Headers(customHeaders);
-  if (!normalizedHeaders.has("Content-Type")) {
+  if (!normalizedHeaders.has("Content-Type") && !(restOptions.body instanceof FormData)) {
     normalizedHeaders.set("Content-Type", "application/json");
   }
 
@@ -49,4 +49,10 @@ export const api = {
 
   delete: <T>(endpoint: string) =>
     request<T>(endpoint, { method: "DELETE" }),
+
+  upload: <T>(endpoint: string, formData: FormData) =>
+    request<T>(endpoint, {
+      method: "POST",
+      body: formData,
+    }),
 };
