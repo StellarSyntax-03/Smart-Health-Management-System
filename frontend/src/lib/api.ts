@@ -1,12 +1,13 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const { headers: customHeaders, ...restOptions } = options || {};
   const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...restOptions,
     headers: {
       "Content-Type": "application/json",
-      ...options?.headers,
+      ...customHeaders,
     },
-    ...options,
   });
 
   if (!res.ok) {
