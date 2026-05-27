@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { registerPatient } from "../../services/patientService.js";
+import { registerPatient, loginPatient } from "../../services/patientService.js";
 import { generateToken } from "../../services/auth.js";
 
 const router = Router();
@@ -47,6 +47,28 @@ router.post("/register", async (req: Request, res: Response) => {
     const message = err instanceof Error ? err.message : "Registration failed";
     const status = message === "Email already registered" ? 409 : 500;
     res.status(status).json({ error: message });
+  }
+});
+
+router.post("/login", async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+
+  try {
+    const user = await loginPatient(email, password);
+    const token = generateToken({ userId: user.id, role: user.role });
+
+    res.json({
+      success: true,
+      data: { user, token },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Login failed";
+    res.status(401).json({ error: message });
   }
 });
 

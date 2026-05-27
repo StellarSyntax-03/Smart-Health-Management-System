@@ -1,5 +1,5 @@
 import prisma from "../config/database.js";
-import { hashPassword } from "./auth.js";
+import { hashPassword, comparePassword } from "./auth.js";
 import { Gender } from "../generated/prisma/client.js";
 
 interface RegisterPatientInput {
@@ -43,6 +43,25 @@ export async function registerPatient(input: RegisterPatientInput) {
     },
     include: { patient: true },
   });
+
+  const { password: _, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+}
+
+export async function loginPatient(email: string, password: string) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { patient: true },
+  });
+
+  if (!user || user.role !== "patient") {
+    throw new Error("Invalid email or password");
+  }
+
+  const valid = await comparePassword(password, user.password);
+  if (!valid) {
+    throw new Error("Invalid email or password");
+  }
 
   const { password: _, ...userWithoutPassword } = user;
   return userWithoutPassword;
