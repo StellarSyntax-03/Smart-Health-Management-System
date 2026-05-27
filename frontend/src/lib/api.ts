@@ -15,14 +15,25 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     }
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  const method = restOptions.method || "GET";
+  const url = `${API_BASE}${endpoint}`;
+
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[API] ${method} ${endpoint}`);
+  }
+
+  const res = await fetch(url, {
     ...restOptions,
     headers: normalizedHeaders,
   });
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error || `HTTP ${res.status}`);
+    const message = error.error || `HTTP ${res.status}`;
+    if (process.env.NODE_ENV === "development") {
+      console.error(`[API] ${method} ${endpoint} -> ${res.status}: ${message}`);
+    }
+    throw new Error(message);
   }
 
   if (res.status === 204 || res.headers.get("Content-Length") === "0") {

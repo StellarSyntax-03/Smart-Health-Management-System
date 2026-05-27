@@ -3,6 +3,7 @@ import cors from "cors";
 import { env, validateEnv } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
+import { requestLogger } from "./middleware/logger.js";
 import patientRoutes from "./routes/patient/index.js";
 import doctorRoutes from "./routes/doctor/index.js";
 import aiRoutes from "./routes/ai/index.js";
@@ -18,6 +19,7 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 app.use(express.json({ limit: "10mb" }));
+app.use(requestLogger);
 
 app.use("/api/patient", patientRoutes);
 app.use("/api/doctor", doctorRoutes);
