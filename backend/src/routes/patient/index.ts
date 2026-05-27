@@ -4,15 +4,17 @@ import { generateToken } from "../../services/auth.js";
 
 const router = Router();
 
+const EXPECTED_ERRORS = ["Email already registered", "Invalid email or password"];
+
 router.post("/register", async (req: Request, res: Response) => {
   const { email, password, name, phone, age, gender, bloodGroup, address, allergies, chronicConditions } = req.body;
 
-  if (!email || !password || !name || !age || !gender) {
+  if (email == null || password == null || name == null || age == null || gender == null) {
     res.status(400).json({ error: "Missing required fields: email, password, name, age, gender" });
     return;
   }
 
-  if (password.length < 6) {
+  if (typeof password !== "string" || password.length < 6) {
     res.status(400).json({ error: "Password must be at least 6 characters" });
     return;
   }
@@ -23,13 +25,29 @@ router.post("/register", async (req: Request, res: Response) => {
     return;
   }
 
+  const parsedAge = Number(age);
+  if (!Number.isFinite(parsedAge) || parsedAge < 0 || parsedAge > 150 || !Number.isInteger(parsedAge)) {
+    res.status(400).json({ error: "Age must be a valid integer between 0 and 150" });
+    return;
+  }
+
+  if (allergies != null && (!Array.isArray(allergies) || !allergies.every((a: unknown) => typeof a === "string"))) {
+    res.status(400).json({ error: "Allergies must be an array of strings" });
+    return;
+  }
+
+  if (chronicConditions != null && (!Array.isArray(chronicConditions) || !chronicConditions.every((c: unknown) => typeof c === "string"))) {
+    res.status(400).json({ error: "Chronic conditions must be an array of strings" });
+    return;
+  }
+
   try {
     const user = await registerPatient({
       email,
       password,
       name,
       phone,
-      age: Number(age),
+      age: parsedAge,
       gender,
       bloodGroup,
       address,
@@ -45,8 +63,11 @@ router.post("/register", async (req: Request, res: Response) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Registration failed";
-    const status = message === "Email already registered" ? 409 : 500;
-    res.status(status).json({ error: message });
+    if (message === "Email already registered") {
+      res.status(409).json({ error: message });
+    } else {
+      res.status(500).json({ error: "Registration failed" });
+    }
   }
 });
 
@@ -67,8 +88,12 @@ router.post("/login", async (req: Request, res: Response) => {
       data: { user, token },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Login failed";
-    res.status(401).json({ error: message });
+    const message = err instanceof Error ? err.message : "";
+    if (EXPECTED_ERRORS.includes(message)) {
+      res.status(401).json({ error: message });
+    } else {
+      res.status(500).json({ error: "Login failed" });
+    }
   }
 });
 

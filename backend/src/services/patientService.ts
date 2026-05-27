@@ -16,36 +16,41 @@ interface RegisterPatientInput {
 }
 
 export async function registerPatient(input: RegisterPatientInput) {
-  const existing = await prisma.user.findUnique({ where: { email: input.email } });
-  if (existing) {
-    throw new Error("Email already registered");
-  }
-
   const hashedPassword = await hashPassword(input.password);
 
-  const user = await prisma.user.create({
-    data: {
-      email: input.email,
-      password: hashedPassword,
-      name: input.name,
-      role: "patient",
-      phone: input.phone,
-      patient: {
-        create: {
-          age: input.age,
-          gender: input.gender,
-          bloodGroup: input.bloodGroup,
-          address: input.address,
-          allergies: input.allergies || [],
-          chronicConditions: input.chronicConditions || [],
+  try {
+    const user = await prisma.user.create({
+      data: {
+        email: input.email,
+        password: hashedPassword,
+        name: input.name,
+        role: "patient",
+        phone: input.phone,
+        patient: {
+          create: {
+            age: input.age,
+            gender: input.gender,
+            bloodGroup: input.bloodGroup,
+            address: input.address,
+            allergies: input.allergies || [],
+            chronicConditions: input.chronicConditions || [],
+          },
         },
       },
-    },
-    include: { patient: true },
-  });
+      include: { patient: true },
+    });
 
-  const { password: _, ...userWithoutPassword } = user;
-  return userWithoutPassword;
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  } catch (err: unknown) {
+    if (
+      typeof err === "object" && err !== null && "code" in err &&
+      (err as { code: string }).code === "P2002"
+    ) {
+      throw new Error("Email already registered", { cause: err });
+    }
+    throw new Error("Registration failed", { cause: err });
+  }
 }
 
 export async function loginPatient(email: string, password: string) {

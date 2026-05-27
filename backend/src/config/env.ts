@@ -27,4 +27,10 @@ export function validateEnv(): void {
   if (!env.DATABASE_URL) {
     console.warn("WARNING: DATABASE_URL is not set. Database features will not work.");
   }
+  if (!process.env.JWT_SECRET) {
+    if (env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET must be set in production");
+    }
+    console.warn("WARNING: JWT_SECRET is not set. Using insecure default.");
+  }
 }
