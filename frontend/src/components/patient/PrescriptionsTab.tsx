@@ -27,25 +27,17 @@ export default function PrescriptionsTab() {
   const [notes, setNotes] = useState("");
   const [meds, setMeds] = useState<MedRow[]>([]);
 
-  async function fetchPrescriptions() {
-    try {
-      const res = await api.get<ApiResponse<Prescription[]>>("/patient/prescriptions");
+  function fetchPrescriptions() {
+    setLoading(true);
+    api.get<ApiResponse<Prescription[]>>("/patient/prescriptions").then((res) => {
       setPrescriptions(res.data || []);
-    } catch {
-      // silent
-    } finally {
+    }).catch(() => {}).finally(() => {
       setLoading(false);
-    }
+    });
   }
 
   useEffect(() => {
-    let cancelled = false;
-    api.get<ApiResponse<Prescription[]>>("/patient/prescriptions").then((res) => {
-      if (!cancelled) setPrescriptions(res.data || []);
-    }).catch(() => {}).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => { cancelled = true; };
+    fetchPrescriptions();
   }, []);
 
   function resetForm() {

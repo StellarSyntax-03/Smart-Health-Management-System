@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Loader2, User, FileText, File } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Loader2, User, FileText, File, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { PatientProfile, ApiResponse } from "@/types";
 import DashboardHeader from "@/components/patient/DashboardHeader";
@@ -22,33 +22,42 @@ export default function PatientDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  async function fetchProfile() {
-    try {
-      const res = await api.get<ApiResponse<PatientProfile>>("/patient/profile");
+  function fetchProfile() {
+    setLoading(true);
+    setError("");
+    api.get<ApiResponse<PatientProfile>>("/patient/profile").then((res) => {
       if (res.data) setProfile(res.data);
-    } catch {
-      // silent
-    } finally {
+    }).catch((err) => {
+      setError(err instanceof Error ? err.message : "Failed to load profile");
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }
 
   useEffect(() => {
-    let cancelled = false;
-    api.get<ApiResponse<PatientProfile>>("/patient/profile").then((res) => {
-      if (!cancelled && res.data) setProfile(res.data);
-    }).catch(() => {}).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => { cancelled = true; };
+    fetchProfile();
   }, []);
 
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <Loader2 size={32} className="animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  if (error && !profile) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="text-center space-y-3">
+          <p className="text-red-600 text-sm">{error}</p>
+          <button onClick={fetchProfile} className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 mx-auto">
+            <RefreshCw size={14} /> Retry
+          </button>
+        </div>
       </div>
     );
   }

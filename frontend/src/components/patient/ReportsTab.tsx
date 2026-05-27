@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
-import { Upload, Download, Trash2, File, Loader2 } from "lucide-react";
+import { Upload, Download, Trash2, File as FileIcon, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { MedicalReport, ApiResponse } from "@/types";
 import UploadModal from "./UploadModal";
@@ -19,25 +19,17 @@ export default function ReportsTab() {
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
 
-  async function fetchReports() {
-    try {
-      const res = await api.get<ApiResponse<MedicalReport[]>>("/patient/reports");
+  function fetchReports() {
+    setLoading(true);
+    api.get<ApiResponse<MedicalReport[]>>("/patient/reports").then((res) => {
       setReports(res.data || []);
-    } catch {
-      // silent
-    } finally {
+    }).catch(() => {}).finally(() => {
       setLoading(false);
-    }
+    });
   }
 
   useEffect(() => {
-    let cancelled = false;
-    api.get<ApiResponse<MedicalReport[]>>("/patient/reports").then((res) => {
-      if (!cancelled) setReports(res.data || []);
-    }).catch(() => {}).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => { cancelled = true; };
+    fetchReports();
   }, []);
 
   function openUpload() {
@@ -98,7 +90,7 @@ export default function ReportsTab() {
 
       {reports.length === 0 ? (
         <div className="text-center py-12 text-slate-400">
-          <File size={40} className="mx-auto mb-3" />
+          <FileIcon size={40} className="mx-auto mb-3" />
           <p>No reports yet</p>
           <button onClick={openUpload} className="text-blue-600 hover:underline text-sm mt-2">Upload your first report</button>
         </div>
@@ -108,7 +100,7 @@ export default function ReportsTab() {
             <div key={report.id} className="bg-white border border-slate-200 rounded-lg p-4 flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <File size={16} className="text-emerald-500 shrink-0" />
+                  <FileIcon size={16} className="text-emerald-500 shrink-0" />
                   <p className="font-medium text-slate-900 truncate">{report.name}</p>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase ${report.type === "pdf" ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"}`}>
                     {report.type}

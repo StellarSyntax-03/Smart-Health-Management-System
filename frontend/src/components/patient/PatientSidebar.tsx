@@ -10,7 +10,7 @@ interface PatientSidebarProps {
 }
 
 function InfoRow({ icon: Icon, label, value }: { icon: typeof Calendar; label: string; value: string | number | null | undefined }) {
-  if (!value) return null;
+  if (value == null) return null;
   return (
     <div className="flex items-center gap-2 text-sm">
       <Icon size={14} className="text-slate-400 shrink-0" />

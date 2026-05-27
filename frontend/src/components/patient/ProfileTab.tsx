@@ -44,11 +44,12 @@ export default function ProfileTab({ profile, onUpdate }: ProfileTabProps) {
     setError("");
     setSaving(true);
     try {
+      const parsedAge = parseInt(form.age, 10);
       await api.put<ApiResponse>("/patient/profile", {
-        name: form.name,
+        name: form.name || undefined,
         phone: form.phone || null,
-        age: parseInt(form.age, 10),
-        gender: form.gender,
+        age: Number.isFinite(parsedAge) ? parsedAge : undefined,
+        gender: form.gender || undefined,
         bloodGroup: form.bloodGroup || null,
         address: form.address || null,
         allergies: form.allergies ? form.allergies.split(",").map((s) => s.trim()).filter(Boolean) : [],
