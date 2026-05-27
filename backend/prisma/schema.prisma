@@ -116,12 +116,13 @@ model Medication {
 }
 
 model MedicalReport {
-  id        String     @id @default(cuid())
-  patientId String
-  name      String
-  date      DateTime   @default(now())
-  type      ReportType
-  url       String
+  id           String     @id @default(cuid())
+  patientId    String
+  name         String
+  date         DateTime   @default(now())
+  type         ReportType
+  url          String
+  filePublicId String?
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
