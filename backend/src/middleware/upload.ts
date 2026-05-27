@@ -1,6 +1,13 @@
 import multer from "multer";
 import { Request, Response, NextFunction } from "express";
 
+export const REPORT_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+];
+
 const ALLOWED_MIMES = [
   "image/jpeg",
   "image/png",

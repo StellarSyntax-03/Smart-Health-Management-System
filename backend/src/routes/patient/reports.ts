@@ -1,6 +1,6 @@
 import { Router, Response } from "express";
 import { authenticate, authorize, AuthRequest } from "../../middleware/auth.js";
-import { uploadSingle } from "../../middleware/upload.js";
+import { uploadSingle, REPORT_MIMES } from "../../middleware/upload.js";
 import { createReport, listReports, getReport, deleteReport } from "../../services/reportService.js";
 import prisma from "../../config/database.js";
 
@@ -16,6 +16,11 @@ async function resolvePatientId(userId: string): Promise<string | null> {
 router.post("/", uploadSingle, async (req: AuthRequest, res: Response) => {
   if (!req.file) {
     res.status(400).json({ error: "File is required" });
+    return;
+  }
+
+  if (!REPORT_MIMES.includes(req.file.mimetype)) {
+    res.status(400).json({ error: "Reports only accept JPEG, PNG, WebP, or PDF files" });
     return;
   }
 
