@@ -1,6 +1,8 @@
 import { Router, Request, Response } from "express";
 import { registerPatient, loginPatient } from "../../services/patientService.js";
 import { generateToken } from "../../services/auth.js";
+import { authenticate, authorize, AuthRequest } from "../../middleware/auth.js";
+import prisma from "../../config/database.js";
 
 const router = Router();
 
@@ -94,6 +96,32 @@ router.post("/login", async (req: Request, res: Response) => {
     } else {
       res.status(500).json({ error: "Login failed" });
     }
+  }
+});
+
+router.get("/profile", authenticate, authorize("patient"), async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        createdAt: true,
+        patient: true,
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: "Patient not found" });
+      return;
+    }
+
+    res.json({ success: true, data: user });
+  } catch {
+    res.status(500).json({ error: "Failed to fetch profile" });
   }
 });
 
