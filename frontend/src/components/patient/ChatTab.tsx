@@ -173,6 +173,10 @@ export default function ChatTab() {
       const formData = new FormData();
       if (text.trim()) formData.append("message", text.trim());
       if (imageFile) formData.append("image", imageFile);
+      if (lastSendWasVoiceRef.current) {
+        formData.append("isVoice", "true");
+        formData.append("voiceLang", recognitionRef.current?.lang || "hi-IN");
+      }
 
       const res = await api.upload<ApiResponse<SendMessageResult>>(
         `/ai/sessions/${sessionId}/messages`,
@@ -402,49 +406,28 @@ export default function ChatTab() {
     });
   }
 
-  function speakText(messageId: string, text: string) {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-
+  function playAssistantAudio(messageId: string, url: string) {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current = null;
+    }
     if (speakingId === messageId) {
-      window.speechSynthesis.cancel();
       setSpeakingId(null);
       return;
     }
-
-    window.speechSynthesis.cancel();
-    const plain = text.replace(/[#*_~`>\-|[\]()]/g, "").replace(/\n{2,}/g, ". ").trim();
-    const utterance = new SpeechSynthesisUtterance(plain);
-    utterance.rate = 1;
-    utterance.pitch = 1;
-
-    const hasHindi = /[ऀ-ॿ]/.test(plain);
-    const voices = window.speechSynthesis.getVoices();
-
-    if (hasHindi) {
-      const hindiVoice = voices.find((v) => v.lang.startsWith("hi"));
-      if (hindiVoice) {
-        utterance.voice = hindiVoice;
-        utterance.lang = "hi-IN";
-      }
-    } else {
-      const enVoice = voices.find((v) => v.name.includes("Samantha")) ||
-        voices.find((v) => v.lang.startsWith("en") && v.name.includes("Female")) ||
-        voices.find((v) => v.lang.startsWith("en"));
-      if (enVoice) utterance.voice = enVoice;
-    }
-
-    utterance.onend = () => setSpeakingId(null);
-    utterance.onerror = () => setSpeakingId(null);
-
+    const audio = new Audio(url);
+    audio.onended = () => { setSpeakingId(null); audioPlayerRef.current = null; };
+    audio.onerror = () => { setSpeakingId(null); audioPlayerRef.current = null; };
+    audioPlayerRef.current = audio;
     setSpeakingId(messageId);
-    window.speechSynthesis.speak(utterance);
+    audio.play();
   }
 
   useEffect(() => {
     if (!sending && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
-      if (lastMsg.role === "assistant" && voiceMessageIds.has(lastMsg.id)) {
-        speakText(lastMsg.id, lastMsg.text);
+      if (lastMsg.role === "assistant" && lastMsg.audioUrl && voiceMessageIds.has(lastMsg.id)) {
+        playAssistantAudio(lastMsg.id, lastMsg.audioUrl);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -692,12 +675,12 @@ export default function ChatTab() {
                             className="max-w-full max-h-48 rounded-xl mb-2"
                           />
                         )}
-                        {msg.role === "assistant" && voiceMessageIds.has(msg.id) ? (
+                        {msg.role === "assistant" && msg.audioUrl ? (
                           <>
                             <div className="flex items-center gap-3 py-1 mb-1">
                               <button
                                 type="button"
-                                onClick={() => speakText(msg.id, msg.text)}
+                                onClick={() => playAssistantAudio(msg.id, msg.audioUrl!)}
                                 className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${
                                   speakingId === msg.id
                                     ? "bg-red-100 text-red-500"

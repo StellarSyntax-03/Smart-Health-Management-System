@@ -1,6 +1,8 @@
 import prisma from "../config/database.js";
 import { healthAgents } from "../mastra/index.js";
 import { uploadFile } from "./cloudinaryService.js";
+import { textToSpeech } from "./ttsService.js";
+import { env } from "../config/env.js";
 
 export async function createSession(patientId: string) {
   return prisma.chatSession.create({
@@ -50,7 +52,7 @@ interface ImageInput {
   mimetype: string;
 }
 
-export async function sendMessage(sessionId: string, patientId: string, text: string, image?: ImageInput) {
+export async function sendMessage(sessionId: string, patientId: string, text: string, image?: ImageInput, isVoice?: boolean, voiceLang?: string) {
   const session = await prisma.chatSession.findFirst({
     where: { id: sessionId, patientId },
     include: {
@@ -169,12 +171,24 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
 
   if (!response) throw new Error("All models failed");
 
+  let audioUrl: string | undefined;
+  if (isVoice && env.SARVAM_API_KEY) {
+    try {
+      const plainText = response.text.replace(/[#*_~`>\-|[\]()]/g, "").replace(/\n{2,}/g, ". ").trim();
+      const audioBuffer = await textToSpeech(plainText, voiceLang);
+      const uploaded = await uploadFile(audioBuffer, `smarthealth/audio/${patientId}`, "raw");
+      audioUrl = uploaded.secureUrl;
+    } catch (err) {
+      console.warn("TTS generation failed, continuing without audio:", err);
+    }
+  }
+
   const [userMessage, assistantMessage] = await prisma.$transaction([
     prisma.chatMessage.create({
       data: { sessionId, role: "user", text: text || "Please analyze this image.", imageUrl },
     }),
     prisma.chatMessage.create({
-      data: { sessionId, role: "assistant", text: response.text },
+      data: { sessionId, role: "assistant", text: response.text, audioUrl },
     }),
   ]);
 
