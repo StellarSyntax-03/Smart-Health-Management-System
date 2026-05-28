@@ -5,6 +5,7 @@ import prescriptionRoutes from "./prescriptions.js";
 import reportRoutes from "./reports.js";
 import vitalRoutes from "./vitals.js";
 import medicationRoutes from "./medications.js";
+import sosRoutes from "./sos.js";
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use("/prescriptions", prescriptionRoutes);
 router.use("/reports", reportRoutes);
 router.use("/vitals", vitalRoutes);
 router.use("/medications", medicationRoutes);
+router.use("/sos", sosRoutes);
 
 export default router;
