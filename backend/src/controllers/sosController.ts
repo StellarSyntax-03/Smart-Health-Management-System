@@ -82,11 +82,27 @@ export async function create(req: AuthRequest, res: Response) {
 
   try {
     const { latitude, longitude } = req.body;
-    const result = await createAlert(
-      patientId,
-      latitude !== undefined ? parseFloat(latitude) : undefined,
-      longitude !== undefined ? parseFloat(longitude) : undefined,
-    );
+
+    let lat: number | undefined;
+    let lng: number | undefined;
+
+    if (latitude !== undefined) {
+      lat = parseFloat(latitude);
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+        res.status(400).json({ error: "Invalid latitude. Must be between -90 and 90." });
+        return;
+      }
+    }
+
+    if (longitude !== undefined) {
+      lng = parseFloat(longitude);
+      if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+        res.status(400).json({ error: "Invalid longitude. Must be between -180 and 180." });
+        return;
+      }
+    }
+
+    const result = await createAlert(patientId, lat, lng);
     res.status(201).json({ success: true, data: result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create SOS alert";

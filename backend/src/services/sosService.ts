@@ -8,15 +8,20 @@ interface SOSSetupInput {
   familyDoctorPhone: string;
 }
 
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/[^+\d]/g, "");
+  return digits.startsWith("+") ? digits : `+${digits}`;
+}
+
 export async function setupSOS(patientId: string, input: SOSSetupInput) {
   return prisma.patient.update({
     where: { id: patientId },
     data: {
       sosEnabled: true,
       emergencyContactName: input.emergencyContactName,
-      emergencyContactPhone: input.emergencyContactPhone,
+      emergencyContactPhone: normalizePhone(input.emergencyContactPhone),
       familyDoctorName: input.familyDoctorName,
-      familyDoctorPhone: input.familyDoctorPhone,
+      familyDoctorPhone: normalizePhone(input.familyDoctorPhone),
     },
   });
 }
@@ -50,6 +55,14 @@ export async function createAlert(patientId: string, latitude?: number, longitud
 
   if (!patient?.sosEnabled) {
     throw new Error("SOS is not enabled. Please set up emergency contacts first.");
+  }
+
+  const existing = await prisma.sOSAlert.findFirst({
+    where: { patientId, status: "active" },
+  });
+
+  if (existing) {
+    throw new Error("An SOS alert is already active.");
   }
 
   const alert = await prisma.sOSAlert.create({
