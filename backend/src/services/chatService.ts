@@ -56,7 +56,22 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
     include: {
       messages: { orderBy: { createdAt: "asc" } },
       patient: {
-        include: { user: { select: { name: true } } },
+        include: {
+          user: { select: { name: true } },
+          prescriptions: {
+            include: { medications: true },
+            orderBy: { date: "desc" },
+            take: 10,
+          },
+          reports: {
+            orderBy: { date: "desc" },
+            take: 10,
+          },
+          vitals: {
+            orderBy: { recordedAt: "desc" },
+            take: 20,
+          },
+        },
       },
     },
   });
@@ -101,6 +116,31 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
   if (patient.bloodGroup) contextParts.push(`Blood group: ${patient.bloodGroup}`);
   if (patient.allergies.length) contextParts.push(`Known allergies: ${patient.allergies.join(", ")}`);
   if (patient.chronicConditions.length) contextParts.push(`Chronic conditions: ${patient.chronicConditions.join(", ")}`);
+
+  if (patient.prescriptions.length) {
+    const rxLines = patient.prescriptions.map((rx) => {
+      const meds = rx.medications.map((m) => `${m.name} ${m.dosage} (${m.frequency}, ${m.duration})`).join("; ");
+      const date = rx.date.toISOString().split("T")[0];
+      return `- [${date}] ${meds || "No medications listed"}${rx.notes ? ` | Notes: ${rx.notes}` : ""}`;
+    });
+    contextParts.push(`\nPrescriptions (recent):\n${rxLines.join("\n")}`);
+  }
+
+  if (patient.reports.length) {
+    const reportLines = patient.reports.map((r) => {
+      const date = r.date.toISOString().split("T")[0];
+      return `- [${date}] ${r.name} (${r.type})`;
+    });
+    contextParts.push(`\nMedical Reports:\n${reportLines.join("\n")}`);
+  }
+
+  if (patient.vitals.length) {
+    const vitalLines = patient.vitals.map((v) => {
+      const date = v.recordedAt.toISOString().split("T")[0];
+      return `- [${date}] ${v.type}: ${v.value} ${v.unit}`;
+    });
+    contextParts.push(`\nRecent Vitals:\n${vitalLines.join("\n")}`);
+  }
 
   const contextNote = contextParts.length
     ? `\n\nPatient context:\n${contextParts.join("\n")}`

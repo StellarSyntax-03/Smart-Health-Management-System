@@ -2,6 +2,7 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth.js";
 import { REPORT_MIMES } from "../middleware/upload.js";
 import { createReport, listReports, getReport, deleteReport } from "../services/reportService.js";
+import { extractVitalsFromReport } from "../services/vitalExtractorService.js";
 import prisma from "../config/database.js";
 
 async function resolvePatientId(userId: string): Promise<string | null> {
@@ -37,6 +38,12 @@ export async function create(req: AuthRequest, res: Response) {
       file: req.file,
       name: req.body.name.trim(),
     });
+
+    if (report.type === "image") {
+      extractVitalsFromReport(report.url, patientId).catch((err) =>
+        console.warn("Vital extraction failed:", err)
+      );
+    }
 
     res.status(201).json({ success: true, data: report });
   } catch {
