@@ -20,37 +20,38 @@ const MAX_SIZE = 10 * 1024 * 1024;
 
 const storage = multer.memoryStorage();
 
-export const upload = multer({
-  storage,
-  limits: { fileSize: MAX_SIZE },
-});
+const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"];
 
-const uploadWithFilter = multer({
-  storage,
-  limits: { fileSize: MAX_SIZE },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIMES.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Invalid file type. Allowed: JPEG, PNG, WebP, PDF, DOCX"));
-    }
-  },
-}).single("file");
+function createFilteredUpload(fieldName: string, allowedMimes: string[]) {
+  const multerMiddleware = multer({
+    storage,
+    limits: { fileSize: MAX_SIZE },
+    fileFilter: (_req, file, cb) => {
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`Invalid file type`));
+      }
+    },
+  }).single(fieldName);
 
-export async function uploadSingle(req: Request, res: Response, next: NextFunction) {
-  uploadWithFilter(req, res, async (err) => {
-    if (err) return next(err);
-    if (!req.file) return next();
+  return async function (req: Request, res: Response, next: NextFunction) {
+    multerMiddleware(req, res, async (err) => {
+      if (err) return next(err);
+      if (!req.file) return next();
 
-    const { fileTypeFromBuffer } = await import("file-type");
-    const detected = await fileTypeFromBuffer(req.file.buffer);
+      const { fileTypeFromBuffer } = await import("file-type");
+      const detected = await fileTypeFromBuffer(req.file.buffer);
 
-    // DOCX and some PDFs may not be detected by magic bytes; allow if multer MIME matched
-    if (detected && !ALLOWED_MIMES.includes(detected.mime)) {
-      res.status(400).json({ error: "File content does not match an allowed type" });
-      return;
-    }
+      if (detected && !allowedMimes.includes(detected.mime)) {
+        res.status(400).json({ error: "File content does not match an allowed type" });
+        return;
+      }
 
-    next();
-  });
+      next();
+    });
+  };
 }
+
+export const uploadSingle = createFilteredUpload("file", ALLOWED_MIMES);
+export const uploadImage = createFilteredUpload("image", IMAGE_MIMES);

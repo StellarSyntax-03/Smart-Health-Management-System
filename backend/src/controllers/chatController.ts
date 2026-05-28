@@ -9,8 +9,6 @@ import {
   sendMessage,
 } from "../services/chatService.js";
 
-const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"];
-
 function getUserId(req: AuthRequest, res: Response): string | null {
   const userId = req.user?.userId;
   if (!userId) {
@@ -86,11 +84,6 @@ export async function sendChatMessage(req: AuthRequest, res: Response) {
 
   const message = req.body.message;
   const file = req.file;
-
-  if (file && !IMAGE_MIMES.includes(file.mimetype)) {
-    res.status(400).json({ success: false, error: "Only JPEG, PNG, and WebP images are supported" });
-    return;
-  }
 
   if ((!message || typeof message !== "string" || !message.trim()) && !file) {
     res.status(400).json({ success: false, error: "Message or image is required" });

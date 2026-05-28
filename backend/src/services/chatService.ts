@@ -1,5 +1,6 @@
 import prisma from "../config/database.js";
 import { mastra } from "../mastra/index.js";
+import { uploadFile } from "./cloudinaryService.js";
 
 export async function createSession(patientId: string) {
   return prisma.chatSession.create({
@@ -62,9 +63,11 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
 
   if (!session) return null;
 
-  const userMessage = await prisma.chatMessage.create({
-    data: { sessionId, role: "user", text },
-  });
+  let imageUrl: string | undefined;
+  if (image) {
+    const result = await uploadFile(image.buffer, `smarthealth/chat/${patientId}`, "image");
+    imageUrl = result.secureUrl;
+  }
 
   type TextContent = { type: "text"; text: string };
   type ImageContent = { type: "image"; image: string; mimeType: string };
@@ -109,9 +112,14 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
     instructions: (baseInstructions || "") + contextNote,
   });
 
-  const assistantMessage = await prisma.chatMessage.create({
-    data: { sessionId, role: "assistant", text: response.text },
-  });
+  const [userMessage, assistantMessage] = await prisma.$transaction([
+    prisma.chatMessage.create({
+      data: { sessionId, role: "user", text: text || "Please analyze this image.", imageUrl },
+    }),
+    prisma.chatMessage.create({
+      data: { sessionId, role: "assistant", text: response.text },
+    }),
+  ]);
 
   return {
     userMessage,
