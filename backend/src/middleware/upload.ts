@@ -20,7 +20,12 @@ const MAX_SIZE = 10 * 1024 * 1024;
 
 const storage = multer.memoryStorage();
 
-const upload = multer({
+export const upload = multer({
+  storage,
+  limits: { fileSize: MAX_SIZE },
+});
+
+const uploadWithFilter = multer({
   storage,
   limits: { fileSize: MAX_SIZE },
   fileFilter: (_req, file, cb) => {
@@ -33,7 +38,7 @@ const upload = multer({
 }).single("file");
 
 export async function uploadSingle(req: Request, res: Response, next: NextFunction) {
-  upload(req, res, async (err) => {
+  uploadWithFilter(req, res, async (err) => {
     if (err) return next(err);
     if (!req.file) return next();
 

@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
+    "@mastra/core": "^1.37.1",
+    "@mastra/express": "^1.3.25",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bcryptjs": "^3.0.3",
