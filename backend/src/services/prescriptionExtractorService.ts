@@ -1,28 +1,35 @@
 import prisma from "../config/database.js";
 import { env } from "../config/env.js";
 
-const EXTRACTION_PROMPT = `Analyze this medical report image and extract any vital signs or lab values present.
+const EXTRACTION_PROMPT = `Analyze this prescription image and extract all medications listed.
 
 Return ONLY a JSON array of objects with these fields:
-- type: one of "heart_rate", "blood_pressure", "temperature", "spo2", "blood_sugar", "weight"
-- value: the reading as a string (e.g. "120/80", "98.6", "72")
-- unit: the unit (e.g. "mmHg", "bpm", "°F", "%", "mg/dL", "kg")
+- name: the medicine name (string)
+- dosage: the dosage like "500mg", "10ml" (string)
+- frequency: one of "Once daily", "Twice daily", "Three times daily", "Four times daily" (string)
+- duration: how long to take it like "7 days", "2 weeks", "1 month" (string)
 
-If no vitals are found, return an empty array: []
+If no medications are found, return an empty array: []
 Do NOT include any explanation, markdown, or text outside the JSON array.`;
 
-interface ExtractedVital {
-  type: string;
-  value: string;
-  unit: string;
+interface ExtractedMedication {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
 }
 
-const VALID_TYPES = new Set(["blood_pressure", "heart_rate", "temperature", "spo2", "blood_sugar", "weight"]);
+const VALID_FREQUENCIES = new Set([
+  "Once daily",
+  "Twice daily",
+  "Three times daily",
+  "Four times daily",
+]);
 
-export async function extractVitalsFromReport(
+export async function extractMedicationsFromPrescription(
   imageUrl: string,
-  patientId: string,
-): Promise<ExtractedVital[]> {
+  prescriptionId: string,
+): Promise<ExtractedMedication[]> {
   if (!env.GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -62,7 +69,7 @@ export async function extractVitalsFromReport(
   const text = data.choices?.[0]?.message?.content;
   if (!text) return [];
 
-  let extracted: ExtractedVital[];
+  let extracted: ExtractedMedication[];
   try {
     const cleaned = text.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
     extracted = JSON.parse(cleaned);
@@ -72,18 +79,24 @@ export async function extractVitalsFromReport(
 
   if (!Array.isArray(extracted)) return [];
 
-  const valid = extracted.filter(
-    (v) => VALID_TYPES.has(v.type) && v.value && v.unit,
-  );
+  const valid = extracted
+    .filter((m) => typeof m.name === "string" && m.name)
+    .map((m) => ({
+      name: m.name,
+      dosage: m.dosage || "As prescribed",
+      frequency: VALID_FREQUENCIES.has(m.frequency) ? m.frequency : "Once daily",
+      duration: m.duration || "As directed",
+    }));
 
   if (valid.length === 0) return [];
 
-  await prisma.vital.createMany({
-    data: valid.map((v) => ({
-      patientId,
-      type: v.type,
-      value: v.value,
-      unit: v.unit,
+  await prisma.medication.createMany({
+    data: valid.map((m) => ({
+      prescriptionId,
+      name: m.name,
+      dosage: m.dosage,
+      frequency: m.frequency,
+      duration: m.duration,
     })),
   });
 

@@ -1,9 +1,22 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
-import { Upload, Download, Trash2, FileText, Plus, Minus, Loader2, Pill } from "lucide-react";
+import {
+  Upload,
+  Download,
+  Trash2,
+  FileText,
+  Plus,
+  Minus,
+  Loader2,
+  Pill,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { api } from "@/lib/api";
-import { Prescription, ApiResponse } from "@/types";
+import { Prescription, Medication, ApiResponse } from "@/types";
 import UploadModal from "./UploadModal";
 
 function formatDate(iso: string) {
@@ -17,6 +30,8 @@ interface MedRow {
   duration: string;
 }
 
+const FREQUENCIES = ["Once daily", "Twice daily", "Three times daily", "Four times daily"];
+
 export default function PrescriptionsTab() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +41,12 @@ export default function PrescriptionsTab() {
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [meds, setMeds] = useState<MedRow[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [addingMedFor, setAddingMedFor] = useState<string | null>(null);
+  const [newMed, setNewMed] = useState<MedRow>({ name: "", dosage: "", frequency: "Once daily", duration: "" });
+  const [addingMedLoading, setAddingMedLoading] = useState(false);
+  const [extractError, setExtractError] = useState("");
 
   function fetchPrescriptions() {
     setLoading(true);
@@ -53,7 +74,7 @@ export default function PrescriptionsTab() {
   }
 
   function addMedRow() {
-    setMeds((prev) => [...prev, { name: "", dosage: "", frequency: "", duration: "" }]);
+    setMeds((prev) => [...prev, { name: "", dosage: "", frequency: "Once daily", duration: "" }]);
   }
 
   function updateMed(index: number, field: keyof MedRow, value: string) {
@@ -99,6 +120,56 @@ export default function PrescriptionsTab() {
     }
   }
 
+  async function handleExtract(rxId: string) {
+    setExtractingId(rxId);
+    setExtractError("");
+    try {
+      const res = await api.post<ApiResponse<Medication[]>>(`/patient/prescriptions/${rxId}/extract`, {});
+      if (res.data && res.data.length > 0) {
+        const freshRes = await api.get<ApiResponse<Prescription[]>>("/patient/prescriptions");
+        if (freshRes.data) setPrescriptions(freshRes.data);
+      } else {
+        setExtractError("No medications found in the image. Try adding manually.");
+      }
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : "Extraction failed");
+    } finally {
+      setExtractingId(null);
+    }
+  }
+
+  async function handleAddMedication(rxId: string) {
+    if (!newMed.name || !newMed.dosage || !newMed.frequency || !newMed.duration) return;
+    setAddingMedLoading(true);
+    try {
+      const res = await api.post<ApiResponse<Medication>>(`/patient/prescriptions/${rxId}/medications`, newMed);
+      if (res.data) {
+        setPrescriptions((prev) =>
+          prev.map((rx) =>
+            rx.id === rxId ? { ...rx, medications: [...rx.medications, res.data!] } : rx,
+          ),
+        );
+        setNewMed({ name: "", dosage: "", frequency: "Once daily", duration: "" });
+        setAddingMedFor(null);
+      }
+    } catch {
+    } finally {
+      setAddingMedLoading(false);
+    }
+  }
+
+  async function handleDeleteMedication(rxId: string, medId: string) {
+    try {
+      await api.delete<ApiResponse>(`/patient/prescriptions/${rxId}/medications/${medId}`);
+      setPrescriptions((prev) =>
+        prev.map((rx) =>
+          rx.id === rxId ? { ...rx, medications: rx.medications.filter((m) => m.id !== medId) } : rx,
+        ),
+      );
+    } catch {
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -132,36 +203,157 @@ export default function PrescriptionsTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {prescriptions.map((rx) => (
-            <div key={rx.id} className="bg-slate-50/50 border border-slate-100 rounded-xl p-4 flex items-start justify-between gap-4 hover:bg-slate-50 transition-colors">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                  <FileText size={18} className="text-blue-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-800 truncate text-sm">{rx.fileName || "Prescription"}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{formatDate(rx.date)}</p>
-                  {rx.notes && <p className="text-sm text-slate-500 mt-1.5">{rx.notes}</p>}
-                  {rx.medications.length > 0 && (
-                    <div className="flex items-center gap-1 mt-1.5">
-                      <Pill size={12} className="text-emerald-500" />
-                      <span className="text-xs text-emerald-600 font-medium">{rx.medications.length} medication(s)</span>
+          {prescriptions.map((rx) => {
+            const isExpanded = expandedId === rx.id;
+
+            return (
+              <div key={rx.id} className="bg-slate-50/50 border border-slate-100 rounded-xl overflow-hidden transition-colors">
+                <div className="p-4 flex items-start justify-between gap-4 hover:bg-slate-50">
+                  <div
+                    className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                    onClick={() => setExpandedId(isExpanded ? null : rx.id)}
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                      <FileText size={18} className="text-blue-500" />
                     </div>
-                  )}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 truncate text-sm">{rx.fileName || "Prescription"}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{formatDate(rx.date)}</p>
+                      {rx.notes && <p className="text-sm text-slate-500 mt-1.5">{rx.notes}</p>}
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {rx.medications.length > 0 ? (
+                          <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                            <Pill size={12} className="text-emerald-500" />
+                            {rx.medications.length} medication(s)
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">No medications extracted</span>
+                        )}
+                        {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {rx.fileUrl && (
+                      <a href={rx.fileUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Download">
+                        <Download size={16} />
+                      </a>
+                    )}
+                    <button onClick={() => handleDelete(rx.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Delete">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {rx.fileUrl && (
-                  <a href={rx.fileUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Download">
-                    <Download size={16} />
-                  </a>
+
+                {isExpanded && (
+                  <div className="px-4 pb-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between mt-3 mb-2">
+                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Medications</h4>
+                      <div className="flex items-center gap-2">
+                        {rx.fileUrl && (
+                          <button
+                            onClick={() => handleExtract(rx.id)}
+                            disabled={extractingId === rx.id}
+                            className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 font-medium bg-purple-50 hover:bg-purple-100 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                          >
+                            {extractingId === rx.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Sparkles size={12} />
+                            )}
+                            {extractingId === rx.id ? "Extracting..." : "AI Extract"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setAddingMedFor(addingMedFor === rx.id ? null : rx.id)}
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-all"
+                        >
+                          {addingMedFor === rx.id ? <X size={12} /> : <Plus size={12} />}
+                          {addingMedFor === rx.id ? "Cancel" : "Add"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {extractError && expandedId === rx.id && (
+                      <div className="bg-amber-50 text-amber-700 text-xs px-3 py-2 rounded-lg border border-amber-100 mb-2">
+                        {extractError}
+                      </div>
+                    )}
+
+                    {addingMedFor === rx.id && (
+                      <div className="bg-white rounded-lg border border-slate-200 p-3 mb-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            placeholder="Medicine name"
+                            value={newMed.name}
+                            onChange={(e) => setNewMed((p) => ({ ...p, name: e.target.value }))}
+                            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                          />
+                          <input
+                            placeholder="Dosage (e.g. 500mg)"
+                            value={newMed.dosage}
+                            onChange={(e) => setNewMed((p) => ({ ...p, dosage: e.target.value }))}
+                            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                          />
+                          <select
+                            value={newMed.frequency}
+                            onChange={(e) => setNewMed((p) => ({ ...p, frequency: e.target.value }))}
+                            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                          >
+                            {FREQUENCIES.map((f) => (
+                              <option key={f} value={f}>{f}</option>
+                            ))}
+                          </select>
+                          <input
+                            placeholder="Duration (e.g. 7 days)"
+                            value={newMed.duration}
+                            onChange={(e) => setNewMed((p) => ({ ...p, duration: e.target.value }))}
+                            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleAddMedication(rx.id)}
+                          disabled={addingMedLoading || !newMed.name || !newMed.dosage || !newMed.duration}
+                          className="flex items-center gap-1 text-xs text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition-all"
+                        >
+                          {addingMedLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                          Add Medication
+                        </button>
+                      </div>
+                    )}
+
+                    {rx.medications.length === 0 ? (
+                      <p className="text-xs text-slate-400 py-3 text-center">
+                        No medications yet. Use &quot;AI Extract&quot; to read from the prescription image, or add manually.
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {rx.medications.map((med) => (
+                          <div key={med.id} className="group flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border border-slate-100">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                              <Pill size={12} className="text-emerald-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-700">{med.name}</p>
+                              <p className="text-xs text-slate-400">
+                                {med.dosage} &middot; {med.frequency} &middot; {med.duration}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteMedication(rx.id, med.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
-                <button onClick={() => handleDelete(rx.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Delete">
-                  <Trash2 size={16} />
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -204,7 +396,12 @@ export default function PrescriptionsTab() {
               <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 mb-2">
                 <input placeholder="Name" value={med.name} onChange={(e) => updateMed(i, "name", e.target.value)} className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" />
                 <input placeholder="Dosage" value={med.dosage} onChange={(e) => updateMed(i, "dosage", e.target.value)} className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" />
-                <input placeholder="Frequency" value={med.frequency} onChange={(e) => updateMed(i, "frequency", e.target.value)} className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" />
+                <select value={med.frequency} onChange={(e) => updateMed(i, "frequency", e.target.value)} className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white">
+                  <option value="">Frequency</option>
+                  {FREQUENCIES.map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
                 <input placeholder="Duration" value={med.duration} onChange={(e) => updateMed(i, "duration", e.target.value)} className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" />
                 <button type="button" onClick={() => removeMed(i)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
                   <Minus size={14} />

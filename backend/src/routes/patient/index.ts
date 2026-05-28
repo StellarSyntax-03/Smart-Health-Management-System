@@ -4,6 +4,7 @@ import { register, login, getProfile, updateProfile } from "../../controllers/pa
 import prescriptionRoutes from "./prescriptions.js";
 import reportRoutes from "./reports.js";
 import vitalRoutes from "./vitals.js";
+import medicationRoutes from "./medications.js";
 
 const router = Router();
 
@@ -15,5 +16,6 @@ router.put("/profile", authenticate, authorize("patient"), updateProfile);
 router.use("/prescriptions", prescriptionRoutes);
 router.use("/reports", reportRoutes);
 router.use("/vitals", vitalRoutes);
+router.use("/medications", medicationRoutes);
 
 export default router;
