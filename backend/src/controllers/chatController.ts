@@ -84,6 +84,8 @@ export async function sendChatMessage(req: AuthRequest, res: Response) {
 
   const message = req.body.message;
   const file = req.file;
+  const isVoice = req.body.isVoice === "true";
+  const voiceLang = req.body.voiceLang as string | undefined;
 
   if ((!message || typeof message !== "string" || !message.trim()) && !file) {
     res.status(400).json({ success: false, error: "Message or image is required" });
@@ -100,6 +102,8 @@ export async function sendChatMessage(req: AuthRequest, res: Response) {
       patientId,
       (message || "").trim(),
       imageInput,
+      isVoice,
+      voiceLang,
     );
     if (!result) {
       res.status(404).json({ success: false, error: "Session not found" });

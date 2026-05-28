@@ -3,6 +3,7 @@ import { authenticate, authorize } from "../../middleware/auth.js";
 import { register, login, getProfile, updateProfile } from "../../controllers/patientController.js";
 import prescriptionRoutes from "./prescriptions.js";
 import reportRoutes from "./reports.js";
+import vitalRoutes from "./vitals.js";
 
 const router = Router();
 
@@ -13,5 +14,6 @@ router.put("/profile", authenticate, authorize("patient"), updateProfile);
 
 router.use("/prescriptions", prescriptionRoutes);
 router.use("/reports", reportRoutes);
+router.use("/vitals", vitalRoutes);
 
 export default router;

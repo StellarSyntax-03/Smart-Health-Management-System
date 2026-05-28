@@ -20,13 +20,15 @@ import ProfileTab from "@/components/patient/ProfileTab";
 import PrescriptionsTab from "@/components/patient/PrescriptionsTab";
 import ReportsTab from "@/components/patient/ReportsTab";
 import ChatTab from "@/components/patient/ChatTab";
+import VitalsTab from "@/components/patient/VitalsTab";
 
-type Tab = "profile" | "prescriptions" | "reports" | "chat";
+type Tab = "profile" | "prescriptions" | "reports" | "vitals" | "chat";
 
 const TABS: { key: Tab; label: string; icon: typeof User }[] = [
   { key: "profile", label: "Profile", icon: User },
   { key: "prescriptions", label: "Prescriptions", icon: FileText },
   { key: "reports", label: "Reports", icon: File },
+  { key: "vitals", label: "Vitals", icon: Heart },
   { key: "chat", label: "AI Chat", icon: MessageCircle },
 ];
 
@@ -195,6 +197,7 @@ export default function PatientDashboard() {
             )}
             {activeTab === "prescriptions" && <PrescriptionsTab />}
             {activeTab === "reports" && <ReportsTab />}
+            {activeTab === "vitals" && <VitalsTab />}
             {activeTab === "chat" && <ChatTab />}
           </div>
         </div>

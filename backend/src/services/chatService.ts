@@ -1,6 +1,8 @@
 import prisma from "../config/database.js";
 import { healthAgents } from "../mastra/index.js";
 import { uploadFile } from "./cloudinaryService.js";
+import { textToSpeech } from "./ttsService.js";
+import { env } from "../config/env.js";
 
 export async function createSession(patientId: string) {
   return prisma.chatSession.create({
@@ -50,13 +52,28 @@ interface ImageInput {
   mimetype: string;
 }
 
-export async function sendMessage(sessionId: string, patientId: string, text: string, image?: ImageInput) {
+export async function sendMessage(sessionId: string, patientId: string, text: string, image?: ImageInput, isVoice?: boolean, voiceLang?: string) {
   const session = await prisma.chatSession.findFirst({
     where: { id: sessionId, patientId },
     include: {
       messages: { orderBy: { createdAt: "asc" } },
       patient: {
-        include: { user: { select: { name: true } } },
+        include: {
+          user: { select: { name: true } },
+          prescriptions: {
+            include: { medications: true },
+            orderBy: { date: "desc" },
+            take: 10,
+          },
+          reports: {
+            orderBy: { date: "desc" },
+            take: 10,
+          },
+          vitals: {
+            orderBy: { recordedAt: "desc" },
+            take: 20,
+          },
+        },
       },
     },
   });
@@ -102,6 +119,31 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
   if (patient.allergies.length) contextParts.push(`Known allergies: ${patient.allergies.join(", ")}`);
   if (patient.chronicConditions.length) contextParts.push(`Chronic conditions: ${patient.chronicConditions.join(", ")}`);
 
+  if (patient.prescriptions.length) {
+    const rxLines = patient.prescriptions.map((rx) => {
+      const meds = rx.medications.map((m) => `${m.name} ${m.dosage} (${m.frequency}, ${m.duration})`).join("; ");
+      const date = rx.date.toISOString().split("T")[0];
+      return `- [${date}] ${meds || "No medications listed"}${rx.notes ? ` | Notes: ${rx.notes}` : ""}`;
+    });
+    contextParts.push(`\nPrescriptions (recent):\n${rxLines.join("\n")}`);
+  }
+
+  if (patient.reports.length) {
+    const reportLines = patient.reports.map((r) => {
+      const date = r.date.toISOString().split("T")[0];
+      return `- [${date}] ${r.name} (${r.type})`;
+    });
+    contextParts.push(`\nMedical Reports:\n${reportLines.join("\n")}`);
+  }
+
+  if (patient.vitals.length) {
+    const vitalLines = patient.vitals.map((v) => {
+      const date = v.recordedAt.toISOString().split("T")[0];
+      return `- [${date}] ${v.type}: ${v.value} ${v.unit}`;
+    });
+    contextParts.push(`\nRecent Vitals:\n${vitalLines.join("\n")}`);
+  }
+
   const contextNote = contextParts.length
     ? `\n\nPatient context:\n${contextParts.join("\n")}`
     : "";
@@ -129,12 +171,24 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
 
   if (!response) throw new Error("All models failed");
 
+  let audioUrl: string | undefined;
+  if (isVoice && env.SARVAM_API_KEY) {
+    try {
+      const plainText = response.text.replace(/[#*_~`>\-|[\]()]/g, "").replace(/\n{2,}/g, ". ").trim();
+      const audioBuffer = await textToSpeech(plainText, voiceLang);
+      const uploaded = await uploadFile(audioBuffer, `smarthealth/audio/${patientId}`, "raw");
+      audioUrl = uploaded.secureUrl;
+    } catch (err) {
+      console.warn("TTS generation failed, continuing without audio:", err);
+    }
+  }
+
   const [userMessage, assistantMessage] = await prisma.$transaction([
     prisma.chatMessage.create({
       data: { sessionId, role: "user", text: text || "Please analyze this image.", imageUrl },
     }),
     prisma.chatMessage.create({
-      data: { sessionId, role: "assistant", text: response.text },
+      data: { sessionId, role: "assistant", text: response.text, audioUrl },
     }),
   ]);
 
