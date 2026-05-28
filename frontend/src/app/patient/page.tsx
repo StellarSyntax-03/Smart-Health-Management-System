@@ -13,6 +13,7 @@ import {
   Calendar,
   Droplets,
   Shield,
+  AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { PatientProfile, ApiResponse } from "@/types";
@@ -23,8 +24,9 @@ import ReportsTab from "@/components/patient/ReportsTab";
 import ChatTab from "@/components/patient/ChatTab";
 import VitalsTab from "@/components/patient/VitalsTab";
 import MedicationsTab from "@/components/patient/MedicationsTab";
+import SOSTab from "@/components/patient/SOSTab";
 
-type Tab = "profile" | "prescriptions" | "reports" | "vitals" | "medications" | "chat";
+type Tab = "profile" | "prescriptions" | "reports" | "vitals" | "medications" | "chat" | "sos";
 
 const TABS: { key: Tab; label: string; icon: typeof User }[] = [
   { key: "profile", label: "Profile", icon: User },
@@ -33,6 +35,7 @@ const TABS: { key: Tab; label: string; icon: typeof User }[] = [
   { key: "vitals", label: "Vitals", icon: Heart },
   { key: "medications", label: "Meds", icon: Pill },
   { key: "chat", label: "AI Chat", icon: MessageCircle },
+  { key: "sos", label: "SOS", icon: AlertTriangle },
 ];
 
 function QuickStat({
@@ -177,8 +180,12 @@ export default function PatientDashboard() {
                 onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
                   activeTab === key
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                    ? key === "sos"
+                      ? "bg-red-600 text-white shadow-sm"
+                      : "bg-blue-600 text-white shadow-sm"
+                    : key === "sos"
+                      ? "text-red-500 hover:text-red-700 hover:bg-red-50"
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 <Icon size={16} />
@@ -203,6 +210,7 @@ export default function PatientDashboard() {
             {activeTab === "vitals" && <VitalsTab />}
             {activeTab === "medications" && <MedicationsTab />}
             {activeTab === "chat" && <ChatTab />}
+            {activeTab === "sos" && <SOSTab />}
           </div>
         </div>
       </main>

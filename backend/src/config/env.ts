@@ -23,6 +23,9 @@ export const env = {
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || "",
   SARVAM_API_KEY: process.env.SARVAM_API_KEY || "",
   GROQ_API_KEY: process.env.GROQ_API_KEY || "",
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || "",
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || "",
+  TWILIO_WHATSAPP_FROM: process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155238886",
 } as const;
 
 export function validateEnv(): void {

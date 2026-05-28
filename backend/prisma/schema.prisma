@@ -49,6 +49,12 @@ model Patient {
   allergies         String[] @default([])
   chronicConditions String[] @default([])
 
+  sosEnabled            Boolean @default(false)
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  familyDoctorName      String?
+  familyDoctorPhone     String?
+
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   prescriptions Prescription[]
   reports       MedicalReport[]

@@ -7,6 +7,7 @@ import { requestLogger } from "./middleware/logger.js";
 import patientRoutes from "./routes/patient/index.js";
 import doctorRoutes from "./routes/doctor/index.js";
 import aiRoutes from "./routes/ai/index.js";
+import twilioWebhook from "./routes/webhooks/twilio.js";
 
 validateEnv();
 
@@ -19,11 +20,13 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: false }));
 app.use(requestLogger);
 
 app.use("/api/patient", patientRoutes);
 app.use("/api/doctor", doctorRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/webhooks/twilio", twilioWebhook);
 
 app.get("/api/health", (_req, res) => {
   res.json({
