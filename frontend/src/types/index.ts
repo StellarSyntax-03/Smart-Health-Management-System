@@ -75,6 +75,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   imageUrl: string | null;
+  audioUrl: string | null;
   createdAt: string;
 }
 

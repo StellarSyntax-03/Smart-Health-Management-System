@@ -12,6 +12,9 @@ import {
   Bot,
   UserIcon,
   Sparkles,
+  Mic,
+  Volume2,
+  Square,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
@@ -38,8 +41,23 @@ export default function ChatTab() {
   const [sending, setSending] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [error, setError] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [voiceMessageIds, setVoiceMessageIds] = useState<Set<string>>(new Set());
+  const [voiceAudioUrls, setVoiceAudioUrls] = useState<Record<string, string>>({});
+  const [expandedTextIds, setExpandedTextIds] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSendWasVoiceRef = useRef(false);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const audioBlobResolveRef = useRef<((url: string) => void) | null>(null);
+  const [playingRawId, setPlayingRawId] = useState<string | null>(null);
+  const pendingAudioBlobRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchSessions();
@@ -138,8 +156,15 @@ export default function ChatTab() {
       role: "user",
       text: text || "Please analyze this image.",
       imageUrl: preview || null,
+      audioUrl: null,
       createdAt: new Date().toISOString(),
     };
+    if (lastSendWasVoiceRef.current) {
+      setVoiceMessageIds((prev) => new Set(prev).add(optimisticUserMsg.id));
+      if (pendingAudioBlobRef.current) {
+        setVoiceAudioUrls((prev) => ({ ...prev, [optimisticUserMsg.id]: pendingAudioBlobRef.current! }));
+      }
+    }
     setMessages((prev) => [...prev, optimisticUserMsg]);
     setInput("");
     clearImage();
@@ -155,6 +180,23 @@ export default function ChatTab() {
       );
 
       if (res.data) {
+        const wasVoice = lastSendWasVoiceRef.current;
+        if (wasVoice) {
+          setVoiceMessageIds((prev) => {
+            const next = new Set(prev);
+            next.delete(optimisticUserMsg.id);
+            next.add(res.data!.userMessage.id);
+            next.add(res.data!.assistantMessage.id);
+            return next;
+          });
+          setVoiceAudioUrls((prev) => {
+            const next = { ...prev };
+            if (next[optimisticUserMsg.id]) {
+              next[res.data!.userMessage.id] = next[optimisticUserMsg.id];
+            }
+            return next;
+          });
+        }
         setMessages((prev) => {
           const filtered = prev.filter((m) => m.id !== optimisticUserMsg.id);
           return [...filtered, res.data!.userMessage, res.data!.assistantMessage];
@@ -172,6 +214,7 @@ export default function ChatTab() {
       setError(err instanceof Error ? err.message : "Failed to send message");
       setInput(text);
     } finally {
+      lastSendWasVoiceRef.current = false;
       setSending(false);
     }
   }
@@ -224,6 +267,188 @@ export default function ChatTab() {
       month: "short",
     });
   }
+
+  async function toggleRecording() {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      setRecordingSeconds(0);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    let sessionId = activeSessionId;
+    if (!sessionId) {
+      setCreatingSession(true);
+      try {
+        const res = await api.post<ApiResponse<ChatSession>>("/ai/sessions", {});
+        if (res.data) {
+          setSessions((prev) => [res.data!, ...prev]);
+          setActiveSessionId(res.data.id);
+          setMessages([]);
+          sessionId = res.data.id;
+        }
+      } catch {
+        setError("Failed to create session");
+        return;
+      } finally {
+        setCreatingSession(false);
+      }
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError("Microphone access denied.");
+      return;
+    }
+
+    audioChunksRef.current = [];
+    const audioBlobPromise = new Promise<string>((resolve) => {
+      audioBlobResolveRef.current = resolve;
+    });
+    const mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunksRef.current.push(e.data);
+    };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const url = URL.createObjectURL(blob);
+      audioBlobResolveRef.current?.(url);
+    };
+    mediaRecorderRef.current = mediaRecorder;
+    mediaRecorder.start();
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "hi-IN";
+    recognition.interimResults = false;
+    recognition.continuous = true;
+
+    let fullTranscript = "";
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i]?.[0]) {
+          fullTranscript += event.results[i][0].transcript + " ";
+        }
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsRecording(false);
+      setRecordingSeconds(0);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      mediaRecorderRef.current?.stop();
+    };
+
+    recognition.onend = async () => {
+      setIsRecording(false);
+      setRecordingSeconds(0);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      const blobUrl = await audioBlobPromise;
+      const text = fullTranscript.trim();
+      if (text && sessionId) {
+        pendingAudioBlobRef.current = blobUrl;
+        lastSendWasVoiceRef.current = true;
+        await sendText(text, sessionId);
+        pendingAudioBlobRef.current = null;
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+    setRecordingSeconds(0);
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingSeconds((s) => s + 1);
+    }, 1000);
+  }
+
+  function playRawAudio(messageId: string, url: string) {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current = null;
+    }
+    if (playingRawId === messageId) {
+      setPlayingRawId(null);
+      return;
+    }
+    const audio = new Audio(url);
+    audio.onended = () => { setPlayingRawId(null); audioPlayerRef.current = null; };
+    audio.onerror = () => { setPlayingRawId(null); audioPlayerRef.current = null; };
+    audioPlayerRef.current = audio;
+    setPlayingRawId(messageId);
+    audio.play();
+  }
+
+  function toggleTextExpand(messageId: string) {
+    setExpandedTextIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) next.delete(messageId);
+      else next.add(messageId);
+      return next;
+    });
+  }
+
+  function speakText(messageId: string, text: string) {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    if (speakingId === messageId) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const plain = text.replace(/[#*_~`>\-|[\]()]/g, "").replace(/\n{2,}/g, ". ").trim();
+    const utterance = new SpeechSynthesisUtterance(plain);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    const hasHindi = /[ऀ-ॿ]/.test(plain);
+    const voices = window.speechSynthesis.getVoices();
+
+    if (hasHindi) {
+      const hindiVoice = voices.find((v) => v.lang.startsWith("hi"));
+      if (hindiVoice) {
+        utterance.voice = hindiVoice;
+        utterance.lang = "hi-IN";
+      }
+    } else {
+      const enVoice = voices.find((v) => v.name.includes("Samantha")) ||
+        voices.find((v) => v.lang.startsWith("en") && v.name.includes("Female")) ||
+        voices.find((v) => v.lang.startsWith("en"));
+      if (enVoice) utterance.voice = enVoice;
+    }
+
+    utterance.onend = () => setSpeakingId(null);
+    utterance.onerror = () => setSpeakingId(null);
+
+    setSpeakingId(messageId);
+    window.speechSynthesis.speak(utterance);
+  }
+
+  useEffect(() => {
+    if (!sending && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === "assistant" && voiceMessageIds.has(lastMsg.id)) {
+        speakText(lastMsg.id, lastMsg.text);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sending]);
 
   return (
     <div className="flex h-[calc(100vh-180px)] rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
@@ -467,10 +692,96 @@ export default function ChatTab() {
                             className="max-w-full max-h-48 rounded-xl mb-2"
                           />
                         )}
-                        {msg.role === "assistant" ? (
+                        {msg.role === "assistant" && voiceMessageIds.has(msg.id) ? (
+                          <>
+                            <div className="flex items-center gap-3 py-1 mb-1">
+                              <button
+                                type="button"
+                                onClick={() => speakText(msg.id, msg.text)}
+                                className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                                  speakingId === msg.id
+                                    ? "bg-red-100 text-red-500"
+                                    : "bg-blue-100 text-blue-600 hover:bg-blue-200"
+                                }`}
+                              >
+                                {speakingId === msg.id ? (
+                                  <Square size={14} className="fill-current" />
+                                ) : (
+                                  <Volume2 size={18} />
+                                )}
+                              </button>
+                              <div className="flex-1">
+                                <div className="flex gap-0.5 items-center h-6">
+                                  {Array.from({ length: 24 }).map((_, i) => (
+                                    <div
+                                      key={i}
+                                      className={`w-1 rounded-full transition-all ${
+                                        speakingId === msg.id
+                                          ? "bg-blue-400 animate-pulse"
+                                          : "bg-slate-300"
+                                      }`}
+                                      style={{ height: `${8 + Math.random() * 16}px` }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleTextExpand(msg.id)}
+                              className="text-[11px] text-blue-500 hover:text-blue-700 transition-colors"
+                            >
+                              {expandedTextIds.has(msg.id) ? "Hide text" : "Show text"}
+                            </button>
+                            {expandedTextIds.has(msg.id) && (
+                              <div className="text-sm leading-relaxed prose prose-sm prose-slate max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-slate-800 mt-2 pt-2 border-t border-slate-100">
+                                <ReactMarkdown>{msg.text}</ReactMarkdown>
+                              </div>
+                            )}
+                          </>
+                        ) : msg.role === "assistant" ? (
                           <div className="text-sm leading-relaxed prose prose-sm prose-slate max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-slate-800">
                             <ReactMarkdown>{msg.text}</ReactMarkdown>
                           </div>
+                        ) : voiceMessageIds.has(msg.id) ? (
+                          <>
+                            <div className="flex items-center gap-3 py-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const blobUrl = voiceAudioUrls[msg.id];
+                                  if (blobUrl) playRawAudio(msg.id, blobUrl);
+                                }}
+                                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                                  playingRawId === msg.id
+                                    ? "bg-white/30 text-white"
+                                    : "bg-white/20 text-white hover:bg-white/30"
+                                }`}
+                              >
+                                {playingRawId === msg.id ? (
+                                  <Square size={12} className="fill-current" />
+                                ) : (
+                                  <Volume2 size={16} />
+                                )}
+                              </button>
+                              <div className="flex-1">
+                                <div className="flex gap-0.5 items-center h-5">
+                                  {Array.from({ length: 20 }).map((_, i) => (
+                                    <div
+                                      key={i}
+                                      className={`w-1 rounded-full ${
+                                        playingRawId === msg.id
+                                          ? "bg-white animate-pulse"
+                                          : "bg-white/50"
+                                      }`}
+                                      style={{ height: `${4 + Math.random() * 12}px` }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <Mic size={14} className="text-white/60 shrink-0" />
+                            </div>
+                          </>
                         ) : (
                           <p className="text-sm whitespace-pre-wrap leading-relaxed">
                             {msg.text}
@@ -539,49 +850,98 @@ export default function ChatTab() {
             )}
 
             {/* Input area */}
-            <form
-              onSubmit={handleSend}
-              className="p-4 border-t border-slate-200 bg-white"
-            >
-              <div className="flex items-end gap-2 max-w-3xl mx-auto">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                  title="Attach image"
-                >
-                  <ImagePlus size={20} />
-                </button>
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask about your health..."
-                    disabled={sending}
-                    className="w-full px-4 py-3 bg-slate-100 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white disabled:opacity-60 placeholder:text-slate-400 transition-all"
-                  />
+            {isRecording ? (
+              <div className="p-4 border-t border-slate-200 bg-white">
+                <div className="flex items-center gap-4 max-w-3xl mx-auto bg-red-50 rounded-2xl px-5 py-4">
+                  <div className="relative">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                    <div className="absolute inset-0 w-3 h-3 bg-red-400 rounded-full animate-ping" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-600">Recording...</p>
+                    <p className="text-xs text-red-400">
+                      {Math.floor(recordingSeconds / 60).toString().padStart(2, "0")}:
+                      {(recordingSeconds % 60).toString().padStart(2, "0")}
+                    </p>
+                  </div>
+                  <div className="flex gap-0.5 items-center h-8">
+                    {Array.from({ length: 16 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1 bg-red-400 rounded-full animate-pulse"
+                        style={{
+                          height: `${6 + Math.random() * 20}px`,
+                          animationDelay: `${i * 100}ms`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleRecording}
+                    className="w-12 h-12 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-all shadow-md shadow-red-500/30"
+                  >
+                    <Square size={18} className="fill-current" />
+                  </button>
                 </div>
-                <button
-                  type="submit"
-                  disabled={sending || (!input.trim() && !image)}
-                  className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-30 disabled:hover:bg-blue-600 transition-all shadow-sm shadow-blue-600/20"
-                >
-                  {sending ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <Send size={18} />
-                  )}
-                </button>
               </div>
-            </form>
+            ) : (
+              <form
+                onSubmit={handleSend}
+                className="p-4 border-t border-slate-200 bg-white"
+              >
+                <div className="flex items-end gap-2 max-w-3xl mx-auto">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                    title="Attach image"
+                  >
+                    <ImagePlus size={20} />
+                  </button>
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      placeholder="Ask about your health..."
+                      disabled={sending}
+                      className="w-full px-4 py-3 bg-slate-100 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white disabled:opacity-60 placeholder:text-slate-400 transition-all"
+                    />
+                  </div>
+                  {input.trim() || image ? (
+                    <button
+                      type="submit"
+                      disabled={sending}
+                      className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all shadow-sm shadow-blue-600/20"
+                    >
+                      {sending ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <Send size={18} />
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={toggleRecording}
+                      disabled={sending}
+                      className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all shadow-sm shadow-blue-600/20"
+                      title="Hold to record voice message"
+                    >
+                      <Mic size={18} />
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
           </>
         )}
       </div>
