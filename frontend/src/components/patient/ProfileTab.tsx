@@ -52,8 +52,12 @@ export default function ProfileTab({ profile, onUpdate }: ProfileTabProps) {
         gender: form.gender || undefined,
         bloodGroup: form.bloodGroup || null,
         address: form.address || null,
-        allergies: form.allergies ? form.allergies.split(",").map((s) => s.trim()).filter(Boolean) : [],
-        chronicConditions: form.chronicConditions ? form.chronicConditions.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        allergies: form.allergies
+          ? form.allergies.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
+        chronicConditions: form.chronicConditions
+          ? form.chronicConditions.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
       });
       setEditing(false);
       onUpdate();
@@ -68,25 +72,46 @@ export default function ProfileTab({ profile, onUpdate }: ProfileTabProps) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  const inputClass = "w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm";
-  const labelClass = "block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wide";
-  const valueClass = "text-sm text-slate-900";
+  const inputClass =
+    "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white text-sm transition-all";
+  const labelClass =
+    "block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider";
+  const valueClass = "text-sm text-slate-800 font-medium";
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-slate-900">Profile</h2>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Profile</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Manage your personal and medical information
+          </p>
+        </div>
         {!editing ? (
-          <button onClick={startEdit} className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
-            <Edit3 size={16} /> Edit
+          <button
+            onClick={startEdit}
+            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-xl transition-all"
+          >
+            <Edit3 size={15} /> Edit
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <button onClick={cancelEdit} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
-              <X size={16} /> Cancel
+            <button
+              onClick={cancelEdit}
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 px-3 py-2 rounded-xl hover:bg-slate-100 transition-all"
+            >
+              <X size={15} /> Cancel
             </button>
-            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 text-sm text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg disabled:opacity-60">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl disabled:opacity-60 shadow-sm transition-all"
+            >
+              {saving ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Save size={14} />
+              )}
               Save
             </button>
           </div>
@@ -94,121 +119,198 @@ export default function ProfileTab({ profile, onUpdate }: ProfileTabProps) {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>
+        <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl mb-5 border border-red-100">
+          {error}
+        </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-slate-700 border-b border-slate-100 pb-2">Personal Information</h3>
-
-          <div>
-            <span className={labelClass}>Name</span>
-            {editing ? (
-              <input type="text" value={form.name} onChange={(e) => updateField("name", e.target.value)} className={inputClass} />
-            ) : (
-              <p className={valueClass}>{profile.name}</p>
-            )}
-          </div>
-
-          <div>
-            <span className={labelClass}>Email</span>
-            <p className={valueClass}>{profile.email}</p>
-          </div>
-
-          <div>
-            <span className={labelClass}>Phone</span>
-            {editing ? (
-              <input type="tel" value={form.phone} onChange={(e) => updateField("phone", e.target.value)} placeholder="Not set" className={inputClass} />
-            ) : (
-              <p className={valueClass}>{profile.phone || "Not set"}</p>
-            )}
-          </div>
-
-          <div>
-            <span className={labelClass}>Age</span>
-            {editing ? (
-              <input type="number" min={0} max={150} value={form.age} onChange={(e) => updateField("age", e.target.value)} className={inputClass} />
-            ) : (
-              <p className={valueClass}>{profile.patient?.age ?? "Not set"}</p>
-            )}
-          </div>
-
-          <div>
-            <span className={labelClass}>Gender</span>
-            {editing ? (
-              <select value={form.gender} onChange={(e) => updateField("gender", e.target.value)} className={inputClass}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div>
+          <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            Personal Information
+          </h3>
+          <div className="space-y-4">
+            <Field label="Name" value={profile.name} editing={editing}>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => updateField("name", e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Email" value={profile.email} editing={false}>
+              <></>
+            </Field>
+            <Field
+              label="Phone"
+              value={profile.phone || "Not set"}
+              editing={editing}
+            >
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => updateField("phone", e.target.value)}
+                placeholder="Not set"
+                className={inputClass}
+              />
+            </Field>
+            <Field
+              label="Age"
+              value={profile.patient?.age ?? "Not set"}
+              editing={editing}
+            >
+              <input
+                type="number"
+                min={0}
+                max={150}
+                value={form.age}
+                onChange={(e) => updateField("age", e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <Field
+              label="Gender"
+              value={profile.patient?.gender || "Not set"}
+              editing={editing}
+            >
+              <select
+                value={form.gender}
+                onChange={(e) => updateField("gender", e.target.value)}
+                className={inputClass}
+              >
                 <option value="">Select</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value="other">Other</option>
               </select>
-            ) : (
-              <p className={valueClass}>{profile.patient?.gender || "Not set"}</p>
-            )}
+            </Field>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-slate-700 border-b border-slate-100 pb-2">Medical Information</h3>
-
-          <div>
-            <span className={labelClass}>Blood Group</span>
-            {editing ? (
-              <select value={form.bloodGroup} onChange={(e) => updateField("bloodGroup", e.target.value)} className={inputClass}>
+        <div>
+          <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Medical Information
+          </h3>
+          <div className="space-y-4">
+            <Field
+              label="Blood Group"
+              value={profile.patient?.bloodGroup || "Not set"}
+              editing={editing}
+            >
+              <select
+                value={form.bloodGroup}
+                onChange={(e) => updateField("bloodGroup", e.target.value)}
+                className={inputClass}
+              >
                 <option value="">Select</option>
-                {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
-                  <option key={bg} value={bg}>{bg}</option>
-                ))}
+                {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
+                  (bg) => (
+                    <option key={bg} value={bg}>
+                      {bg}
+                    </option>
+                  )
+                )}
               </select>
-            ) : (
-              <p className={valueClass}>{profile.patient?.bloodGroup || "Not set"}</p>
-            )}
-          </div>
-
-          <div>
-            <span className={labelClass}>Address</span>
-            {editing ? (
-              <input type="text" value={form.address} onChange={(e) => updateField("address", e.target.value)} placeholder="Not set" className={inputClass} />
-            ) : (
-              <p className={valueClass}>{profile.patient?.address || "Not set"}</p>
-            )}
-          </div>
-
-          <div>
-            <span className={labelClass}>Allergies</span>
-            {editing ? (
-              <input type="text" value={form.allergies} onChange={(e) => updateField("allergies", e.target.value)} placeholder="Comma separated" className={inputClass} />
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {profile.patient?.allergies?.length ? (
-                  profile.patient.allergies.map((a) => (
-                    <span key={a} className="bg-red-50 text-red-700 text-xs px-2 py-1 rounded-full">{a}</span>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400">None</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <span className={labelClass}>Chronic Conditions</span>
-            {editing ? (
-              <input type="text" value={form.chronicConditions} onChange={(e) => updateField("chronicConditions", e.target.value)} placeholder="Comma separated" className={inputClass} />
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {profile.patient?.chronicConditions?.length ? (
-                  profile.patient.chronicConditions.map((c) => (
-                    <span key={c} className="bg-amber-50 text-amber-700 text-xs px-2 py-1 rounded-full">{c}</span>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400">None</p>
-                )}
-              </div>
-            )}
+            </Field>
+            <Field
+              label="Address"
+              value={profile.patient?.address || "Not set"}
+              editing={editing}
+            >
+              <input
+                type="text"
+                value={form.address}
+                onChange={(e) => updateField("address", e.target.value)}
+                placeholder="Not set"
+                className={inputClass}
+              />
+            </Field>
+            <div>
+              <span className={labelClass}>Allergies</span>
+              {editing ? (
+                <input
+                  type="text"
+                  value={form.allergies}
+                  onChange={(e) => updateField("allergies", e.target.value)}
+                  placeholder="Comma separated"
+                  className={inputClass}
+                />
+              ) : (
+                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                  {profile.patient?.allergies?.length ? (
+                    profile.patient.allergies.map((a) => (
+                      <span
+                        key={a}
+                        className="bg-red-50 text-red-600 text-xs px-2.5 py-1 rounded-lg font-medium border border-red-100"
+                      >
+                        {a}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-400">None</p>
+                  )}
+                </div>
+              )}
+            </div>
+            <div>
+              <span className={labelClass}>Chronic Conditions</span>
+              {editing ? (
+                <input
+                  type="text"
+                  value={form.chronicConditions}
+                  onChange={(e) =>
+                    updateField("chronicConditions", e.target.value)
+                  }
+                  placeholder="Comma separated"
+                  className={inputClass}
+                />
+              ) : (
+                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                  {profile.patient?.chronicConditions?.length ? (
+                    profile.patient.chronicConditions.map((c) => (
+                      <span
+                        key={c}
+                        className="bg-amber-50 text-amber-600 text-xs px-2.5 py-1 rounded-lg font-medium border border-amber-100"
+                      >
+                        {c}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-400">None</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  editing,
+  children,
+}: {
+  label: string;
+  value: string | number;
+  editing: boolean;
+  children: React.ReactNode;
+}) {
+  const labelClass =
+    "block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider";
+  return (
+    <div>
+      <span className={labelClass}>{label}</span>
+      {editing ? (
+        children
+      ) : (
+        <p className="text-sm text-slate-800 font-medium capitalize">{value}</p>
+      )}
     </div>
   );
 }
