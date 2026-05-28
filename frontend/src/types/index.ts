@@ -69,8 +69,31 @@ export interface PatientProfile {
   } | null;
 }
 
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  text: string;
+  imageUrl: string | null;
+  createdAt: string;
+}
+
+export interface ChatSession {
+  id: string;
+  patientId: string;
+  createdAt: string;
+  messages: ChatMessage[];
+}
+
+export interface SendMessageResult {
+  userMessage: ChatMessage;
+  assistantMessage: ChatMessage;
+  usage: Record<string, unknown>;
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+  message?: string;
 }

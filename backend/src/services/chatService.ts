@@ -1,5 +1,5 @@
 import prisma from "../config/database.js";
-import { mastra } from "../mastra/index.js";
+import { healthAgents } from "../mastra/index.js";
 import { uploadFile } from "./cloudinaryService.js";
 
 export async function createSession(patientId: string) {
@@ -106,11 +106,28 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
     ? `\n\nPatient context:\n${contextParts.join("\n")}`
     : "";
 
-  const agent = mastra.getAgent("healthAgent");
-  const baseInstructions = await agent.getInstructions();
-  const response = await agent.generate(history, {
-    instructions: (baseInstructions || "") + contextNote,
-  });
+  let response: { text: string; usage: Record<string, unknown> } | null = null;
+  for (const agent of healthAgents) {
+    try {
+      const baseInstructions = await agent.getInstructions();
+      response = await agent.generate(history, {
+        instructions: (baseInstructions || "") + contextNote,
+      });
+      break;
+    } catch (err: unknown) {
+      const isRateLimit =
+        err instanceof Error &&
+        (err.message.includes("429") ||
+          err.message.includes("RESOURCE_EXHAUSTED") ||
+          err.message.includes("quota"));
+      if (!isRateLimit || agent === healthAgents[healthAgents.length - 1]) {
+        throw err;
+      }
+      console.warn(`Rate limited on ${agent.id}, trying next model...`);
+    }
+  }
+
+  if (!response) throw new Error("All models failed");
 
   const [userMessage, assistantMessage] = await prisma.$transaction([
     prisma.chatMessage.create({
