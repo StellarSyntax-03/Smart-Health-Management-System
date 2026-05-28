@@ -111,8 +111,23 @@ model Medication {
   duration       String
 
   prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  logs         MedicationLog[]
 
   @@map("medications")
+}
+
+model MedicationLog {
+  id           String   @id @default(cuid())
+  medicationId String
+  date         DateTime
+  timeSlot     String
+  taken        Boolean  @default(false)
+  takenAt      DateTime?
+
+  medication Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  @@unique([medicationId, date, timeSlot])
+  @@map("medication_logs")
 }
 
 model MedicalReport {
