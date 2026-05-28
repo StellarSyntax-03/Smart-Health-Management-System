@@ -27,11 +27,17 @@ Guidelines:
 - When analyzing images: describe what you observe briefly, note visible abnormalities, and recommend professional evaluation
 - Never provide a definitive diagnosis from images alone`;
 
-export const healthAgent = new Agent({
-  id: "healthAgent",
-  name: "SmartHealth AI",
-  instructions: SYSTEM_PROMPT,
-  model: {
-    id: "google/gemini-2.5-flash-lite",
-  },
-});
+const MODELS = [
+  "google/gemini-2.5-flash-lite",
+  "google/gemini-2.0-flash",
+  "google/gemini-2.0-flash-lite",
+] as const;
+
+export const healthAgents = MODELS.map((modelId, i) =>
+  new Agent({
+    id: `healthAgent${i === 0 ? "" : `_fallback${i}`}`,
+    name: "SmartHealth AI",
+    instructions: SYSTEM_PROMPT,
+    model: { id: modelId },
+  })
+);

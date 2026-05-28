@@ -131,7 +131,7 @@ export default function ProfileTab({ profile, onUpdate }: ProfileTabProps) {
             Personal Information
           </h3>
           <div className="space-y-4">
-            <Field label="Name" value={profile.name} editing={editing}>
+            <Field label="Name" value={profile.name} editing={editing} capitalize>
               <input
                 type="text"
                 value={form.name}
@@ -173,6 +173,7 @@ export default function ProfileTab({ profile, onUpdate }: ProfileTabProps) {
               label="Gender"
               value={profile.patient?.gender || "Not set"}
               editing={editing}
+              capitalize
             >
               <select
                 value={form.gender}
@@ -294,11 +295,13 @@ function Field({
   label,
   value,
   editing,
+  capitalize = false,
   children,
 }: {
   label: string;
   value: string | number;
   editing: boolean;
+  capitalize?: boolean;
   children: React.ReactNode;
 }) {
   const labelClass =
@@ -309,7 +312,7 @@ function Field({
       {editing ? (
         children
       ) : (
-        <p className="text-sm text-slate-800 font-medium capitalize">{value}</p>
+        <p className={`text-sm text-slate-800 font-medium ${capitalize ? "capitalize" : ""}`}>{value}</p>
       )}
     </div>
   );

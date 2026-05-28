@@ -126,35 +126,31 @@ export default function ChatTab() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    if ((!input.trim() && !image) || !activeSessionId || sending) return;
+  async function sendText(text: string, sessionId: string, imageFile?: File | null, preview?: string | null) {
+    if (sending) return;
 
     setSending(true);
     setError("");
 
     const optimisticUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
-      sessionId: activeSessionId,
+      sessionId,
       role: "user",
-      text: input.trim() || "Please analyze this image.",
-      imageUrl: imagePreview,
+      text: text || "Please analyze this image.",
+      imageUrl: preview || null,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, optimisticUserMsg]);
-
-    const currentInput = input;
-    const currentImage = image;
     setInput("");
     clearImage();
 
     try {
       const formData = new FormData();
-      if (currentInput.trim()) formData.append("message", currentInput.trim());
-      if (currentImage) formData.append("image", currentImage);
+      if (text.trim()) formData.append("message", text.trim());
+      if (imageFile) formData.append("image", imageFile);
 
       const res = await api.upload<ApiResponse<SendMessageResult>>(
-        `/ai/sessions/${activeSessionId}/messages`,
+        `/ai/sessions/${sessionId}/messages`,
         formData
       );
 
@@ -165,8 +161,8 @@ export default function ChatTab() {
         });
         setSessions((prev) =>
           prev.map((s) =>
-            s.id === activeSessionId
-              ? { ...s, messages: [res.data!.assistantMessage] }
+            s.id === sessionId
+              ? { ...s, messages: [res.data!.userMessage] }
               : s
           )
         );
@@ -174,14 +170,21 @@ export default function ChatTab() {
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMsg.id));
       setError(err instanceof Error ? err.message : "Failed to send message");
-      setInput(currentInput);
+      setInput(text);
     } finally {
       setSending(false);
     }
   }
 
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    if ((!input.trim() && !image) || !activeSessionId || sending) return;
+    sendText(input.trim(), activeSessionId, image, imagePreview);
+  }
+
   async function handleSuggestion(text: string) {
-    if (!activeSessionId) {
+    let sessionId = activeSessionId;
+    if (!sessionId) {
       setCreatingSession(true);
       try {
         const res = await api.post<ApiResponse<ChatSession>>("/ai/sessions", {});
@@ -189,24 +192,16 @@ export default function ChatTab() {
           setSessions((prev) => [res.data!, ...prev]);
           setActiveSessionId(res.data.id);
           setMessages([]);
-          setInput(text);
-          setTimeout(() => {
-            const form = document.getElementById("chat-form") as HTMLFormElement;
-            form?.requestSubmit();
-          }, 100);
+          sessionId = res.data.id;
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to create session");
+        return;
       } finally {
         setCreatingSession(false);
       }
-      return;
     }
-    setInput(text);
-    setTimeout(() => {
-      const form = document.getElementById("chat-form") as HTMLFormElement;
-      form?.requestSubmit();
-    }, 100);
+    if (sessionId) sendText(text, sessionId);
   }
 
   function getSessionPreview(session: ChatSession) {
@@ -233,7 +228,7 @@ export default function ChatTab() {
   return (
     <div className="flex h-[calc(100vh-180px)] rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
       {/* Sessions sidebar */}
-      <div className="w-80 border-r border-slate-200 flex flex-col shrink-0 hidden md:flex bg-slate-50/70">
+      <div className="w-80 border-r border-slate-200 flex-col shrink-0 hidden md:flex bg-slate-50/70">
         <div className="p-4 border-b border-slate-200 bg-white">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
@@ -545,7 +540,6 @@ export default function ChatTab() {
 
             {/* Input area */}
             <form
-              id="chat-form"
               onSubmit={handleSend}
               className="p-4 border-t border-slate-200 bg-white"
             >
