@@ -8,9 +8,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
+import { Camera } from "expo-camera";
 import { api } from "../../lib/api";
 import { ApiResponse } from "../../types";
 import { colors } from "../../lib/colors";
@@ -114,6 +116,13 @@ export default function SOSTab() {
   }, [fetchData]);
 
   useEffect(() => {
+    if (Platform.OS !== "web") {
+      Location.requestForegroundPermissionsAsync();
+      Camera.requestCameraPermissionsAsync();
+    }
+  }, []);
+
+  useEffect(() => {
     if (!activeAlert) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
@@ -156,25 +165,28 @@ export default function SOSTab() {
     }
   }
 
-  function handleDisable() {
-    Alert.alert("Disable SOS", "Your emergency contacts will be kept but alerts won't be sent.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Disable",
-        style: "destructive",
-        onPress: async () => {
-          setDisabling(true);
-          try {
-            await api.post<ApiResponse>("/patient/sos/disable", {});
-            setConfig((prev) => prev ? { ...prev, sosEnabled: false } : null);
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to disable");
-          } finally {
-            setDisabling(false);
-          }
-        },
-      },
-    ]);
+  async function handleDisable() {
+    if (Platform.OS === "web") {
+      if (!window.confirm("Disable SOS? Your emergency contacts will be kept but alerts won't be sent.")) return;
+    } else {
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Alert.alert("Disable SOS", "Your emergency contacts will be kept but alerts won't be sent.", [
+          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+          { text: "Disable", style: "destructive", onPress: () => resolve(true) },
+        ]);
+      });
+      if (!confirmed) return;
+    }
+
+    setDisabling(true);
+    try {
+      await api.post<ApiResponse>("/patient/sos/disable", {});
+      setConfig((prev) => prev ? { ...prev, sosEnabled: false } : null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to disable");
+    } finally {
+      setDisabling(false);
+    }
   }
 
   async function captureAndSendPhotos() {
