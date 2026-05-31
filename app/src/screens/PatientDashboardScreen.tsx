@@ -20,8 +20,9 @@ import PrescriptionsTab from "./tabs/PrescriptionsTab";
 import ReportsTab from "./tabs/ReportsTab";
 import HealthAssistantTab from "./tabs/HealthAssistantTab";
 import SOSTab from "./tabs/SOSTab";
+import SymptomCheckerTab from "./tabs/SymptomCheckerTab";
 
-type TabKey = "home" | "profile" | "vitals" | "medications" | "prescriptions" | "reports" | "chat" | "sos";
+type TabKey = "home" | "profile" | "vitals" | "medications" | "prescriptions" | "reports" | "chat" | "symptoms" | "sos";
 
 const TABS: { key: TabKey; label: string; icon: string; color?: string }[] = [
   { key: "home", label: "Home", icon: "home" },
@@ -30,6 +31,7 @@ const TABS: { key: TabKey; label: string; icon: string; color?: string }[] = [
   { key: "prescriptions", label: "Rx", icon: "document-text" },
   { key: "reports", label: "Reports", icon: "folder" },
   { key: "chat", label: "Health Assistant", icon: "chatbubbles" },
+  { key: "symptoms", label: "Symptoms", icon: "fitness" },
   { key: "sos", label: "SOS", icon: "alert-circle", color: "#ef4444" },
 ];
 
@@ -88,6 +90,7 @@ export default function PatientDashboardScreen() {
       case "prescriptions": return <PrescriptionsTab />;
       case "reports": return <ReportsTab />;
       case "chat": return <HealthAssistantTab />;
+      case "symptoms": return <SymptomCheckerTab />;
       case "sos": return <SOSTab />;
       default: return null;
     }

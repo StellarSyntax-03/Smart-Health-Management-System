@@ -116,8 +116,23 @@ export async function sendMessage(sessionId: string, patientId: string, text: st
   if (patient.age) contextParts.push(`Age: ${patient.age}`);
   if (patient.gender) contextParts.push(`Gender: ${patient.gender}`);
   if (patient.bloodGroup) contextParts.push(`Blood group: ${patient.bloodGroup}`);
-  if (patient.allergies.length) contextParts.push(`Known allergies: ${patient.allergies.join(", ")}`);
-  if (patient.chronicConditions.length) contextParts.push(`Chronic conditions: ${patient.chronicConditions.join(", ")}`);
+  if (patient.allergies.length) {
+    const codified = (patient.codifiedAllergies as any[]) || [];
+    const allergyDetails = patient.allergies.map((a) => {
+      const code = codified.find((c: any) => c.text === a);
+      return code ? `${a} (SNOMED: ${code.snomedCode} - ${code.snomedName})` : a;
+    });
+    contextParts.push(`Known allergies: ${allergyDetails.join(", ")}`);
+  }
+  if (patient.chronicConditions.length) {
+    const codified = (patient.codifiedConditions as any[]) || [];
+    const condDetails = patient.chronicConditions.map((c) => {
+      const code = codified.find((cd: any) => cd.text === c);
+      return code ? `${c} (SNOMED: ${code.snomedCode} - ${code.snomedName})` : c;
+    });
+    contextParts.push(`Chronic conditions: ${condDetails.join(", ")}`);
+  }
+  if (patient.address) contextParts.push(`Location: ${patient.address}`);
 
   if (patient.prescriptions.length) {
     const rxLines = patient.prescriptions.map((rx) => {
