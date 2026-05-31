@@ -7,10 +7,11 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
   Image,
   Alert,
+  Keyboard,
+  Animated,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -51,6 +52,7 @@ export default function HealthAssistantTab() {
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const keyboardPadding = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchSessions();
@@ -59,6 +61,27 @@ export default function HealthAssistantTab() {
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   }, [messages]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(keyboardPadding, {
+        toValue: e.endCoordinates.height,
+        duration: e.duration || 250,
+        useNativeDriver: false,
+      }).start();
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardPadding, {
+        toValue: 0,
+        duration: (e as any).duration || 250,
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   async function fetchSessions() {
     setLoadingSessions(true);
@@ -238,6 +261,31 @@ export default function HealthAssistantTab() {
         const uri = recorder.uri;
         if (!uri) return;
 
+        setSending(true);
+        setError("");
+
+        // Read file into memory synchronously before expo-audio deletes it
+        const fileXhr = new XMLHttpRequest();
+        fileXhr.open("GET", uri, false);
+        fileXhr.responseType = "arraybuffer";
+        fileXhr.send();
+        const audioBlob = new Blob([fileXhr.response], { type: "audio/mp4" });
+
+        const audioForm = new FormData();
+        audioForm.append("audio", audioBlob, "recording.m4a");
+        audioForm.append("languageCode", "hi-IN");
+
+        const transcribeRes = await api.upload<ApiResponse<{ transcript: string }>>(
+          "/ai/transcribe",
+          audioForm,
+        );
+        const transcript = transcribeRes.data?.transcript?.trim();
+        if (!transcript) {
+          setError("Could not transcribe audio. Try again.");
+          setSending(false);
+          return;
+        }
+
         let sessionId = activeSessionId;
         if (!sessionId) {
           setCreatingSession(true);
@@ -257,28 +305,6 @@ export default function HealthAssistantTab() {
           }
         }
         if (!sessionId) return;
-
-        setSending(true);
-        setError("");
-
-        const audioForm = new FormData();
-        audioForm.append("audio", {
-          uri,
-          name: "recording.m4a",
-          type: "audio/mp4",
-        } as any);
-        audioForm.append("languageCode", "hi-IN");
-
-        const transcribeRes = await api.upload<ApiResponse<{ transcript: string }>>(
-          "/ai/transcribe",
-          audioForm,
-        );
-        const transcript = transcribeRes.data?.transcript?.trim();
-        if (!transcript) {
-          setError("Could not transcribe audio. Try again.");
-          setSending(false);
-          return;
-        }
 
         setSending(false);
         sendVoiceMessage(transcript, sessionId);
@@ -502,10 +528,8 @@ export default function HealthAssistantTab() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.chatContainer}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 140 : 0}
+    <Animated.View
+      style={[styles.chatContainer, { paddingBottom: keyboardPadding }]}
     >
       <View style={styles.chatHeader}>
         <TouchableOpacity onPress={() => setShowSessions(true)} style={styles.backBtn}>
@@ -696,7 +720,7 @@ export default function HealthAssistantTab() {
           )}
         </View>
       )}
-    </KeyboardAvoidingView>
+    </Animated.View>
   );
 }
 

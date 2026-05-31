@@ -204,7 +204,9 @@ export default function SOSTab() {
       }
 
       await api.upload("/patient/sos/photos", formData);
-    } catch {}
+    } catch (err: any) {
+      console.log("[SOS] Photo upload error:", err?.message || err);
+    }
   }
 
   async function handleSOS() {

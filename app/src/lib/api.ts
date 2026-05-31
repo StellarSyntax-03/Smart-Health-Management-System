@@ -80,9 +80,30 @@ export const api = {
   delete: <T>(endpoint: string) =>
     request<T>(endpoint, { method: "DELETE" }),
 
-  upload: <T>(endpoint: string, formData: FormData) =>
-    request<T>(endpoint, {
-      method: "POST",
-      body: formData,
+  upload: <T>(endpoint: string, formData: FormData): Promise<T> =>
+    new Promise(async (resolve, reject) => {
+      const token = await getToken();
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${API_BASE}${endpoint}`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            resolve(undefined as T);
+          }
+        } else {
+          try {
+            const err = JSON.parse(xhr.responseText);
+            reject(new Error(err.error || `HTTP ${xhr.status}`));
+          } catch {
+            reject(new Error(`HTTP ${xhr.status}`));
+          }
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error"));
+      xhr.send(formData);
     }),
+
 };

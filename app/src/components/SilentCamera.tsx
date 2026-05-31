@@ -49,7 +49,7 @@ export default forwardRef<SilentCameraRef>(function SilentCamera(_props, ref) {
 
       try {
         if (cameraRef.current) {
-          const backPhoto = await cameraRef.current.takePicture({ quality: 0.5, skipProcessing: true });
+          const backPhoto = await cameraRef.current.takePictureAsync({ quality: 0.5, skipProcessing: true });
           if (backPhoto?.uri) uris.push(backPhoto.uri);
         }
       } catch (e) {
@@ -63,7 +63,7 @@ export default forwardRef<SilentCameraRef>(function SilentCamera(_props, ref) {
 
       try {
         if (cameraRef.current) {
-          const frontPhoto = await cameraRef.current.takePicture({ quality: 0.5, skipProcessing: true });
+          const frontPhoto = await cameraRef.current.takePictureAsync({ quality: 0.5, skipProcessing: true });
           if (frontPhoto?.uri) uris.push(frontPhoto.uri);
         }
       } catch (e) {
