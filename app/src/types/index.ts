@@ -76,6 +76,8 @@ export interface MedicalReport {
   type: "pdf" | "image";
   url: string;
   filePublicId: string | null;
+  parsedData?: any;
+  ekaDocId?: string | null;
 }
 
 export interface PatientProfile {

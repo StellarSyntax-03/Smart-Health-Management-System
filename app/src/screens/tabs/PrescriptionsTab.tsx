@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../lib/api";
 import { Prescription, Medication, ApiResponse } from "../../types";
 import { colors } from "../../lib/colors";
+
+interface DrugSuggestion {
+  id: string;
+  name: string;
+  generic_name?: string;
+  manufacturer_name?: string;
+  product_type?: string;
+  product_sku?: string;
+}
 
 const FREQUENCIES = ["Once daily", "Twice daily", "Three times daily", "Four times daily"];
 
@@ -45,6 +54,28 @@ export default function PrescriptionsTab() {
   const [newMed, setNewMed] = useState<MedRow>({ name: "", dosage: "", frequency: "Once daily", duration: "" });
   const [addingMedLoading, setAddingMedLoading] = useState(false);
   const [showFreqPicker, setShowFreqPicker] = useState(false);
+  const [drugSuggestions, setDrugSuggestions] = useState<DrugSuggestion[]>([]);
+  const [drugSearching, setDrugSearching] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const searchDrugs = useCallback((query: string) => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (query.length < 2) {
+      setDrugSuggestions([]);
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
+      setDrugSearching(true);
+      try {
+        const res = await api.get<{ results: DrugSuggestion[] }>(`/patient/drugs/search?q=${encodeURIComponent(query)}&limit=6`);
+        setDrugSuggestions(res.results ?? []);
+      } catch {
+        setDrugSuggestions([]);
+      } finally {
+        setDrugSearching(false);
+      }
+    }, 300);
+  }, []);
 
   useEffect(() => {
     fetchPrescriptions();
@@ -147,6 +178,7 @@ export default function PrescriptionsTab() {
           ),
         );
         setNewMed({ name: "", dosage: "", frequency: "Once daily", duration: "" });
+        setDrugSuggestions([]);
         setAddingMedFor(null);
       }
     } catch {
@@ -324,21 +356,54 @@ export default function PrescriptionsTab() {
 
                   {addingMedFor === rx.id && (
                     <View style={styles.addMedForm}>
-                      <View style={styles.addMedRow}>
-                        <TextInput
-                          style={[styles.addMedInput, { flex: 1 }]}
-                          value={newMed.name}
-                          onChangeText={(v) => setNewMed((p) => ({ ...p, name: v }))}
-                          placeholder="Medicine name"
-                          placeholderTextColor={colors.slate[400]}
-                        />
-                        <TextInput
-                          style={[styles.addMedInput, { flex: 1 }]}
-                          value={newMed.dosage}
-                          onChangeText={(v) => setNewMed((p) => ({ ...p, dosage: v }))}
-                          placeholder="Dosage"
-                          placeholderTextColor={colors.slate[400]}
-                        />
+                      <View style={{ zIndex: 10 }}>
+                        <View style={styles.addMedRow}>
+                          <View style={{ flex: 1 }}>
+                            <TextInput
+                              style={styles.addMedInput}
+                              value={newMed.name}
+                              onChangeText={(v) => {
+                                setNewMed((p) => ({ ...p, name: v }));
+                                searchDrugs(v);
+                              }}
+                              placeholder="Search medicine..."
+                              placeholderTextColor={colors.slate[400]}
+                            />
+                            {drugSearching && (
+                              <ActivityIndicator size={12} color={colors.blue[400]} style={styles.searchSpinner} />
+                            )}
+                          </View>
+                          <TextInput
+                            style={[styles.addMedInput, { flex: 1 }]}
+                            value={newMed.dosage}
+                            onChangeText={(v) => setNewMed((p) => ({ ...p, dosage: v }))}
+                            placeholder="Dosage"
+                            placeholderTextColor={colors.slate[400]}
+                          />
+                        </View>
+                        {drugSuggestions.length > 0 && (
+                          <View style={styles.suggestionsDropdown}>
+                            {drugSuggestions.map((drug) => (
+                              <TouchableOpacity
+                                key={drug.id}
+                                style={styles.suggestionItem}
+                                onPress={() => {
+                                  const dosage = drug.generic_name?.match(/\(([^)]+)\)/)?.[1] || "";
+                                  setNewMed((p) => ({ ...p, name: drug.name, dosage: dosage || p.dosage }));
+                                  setDrugSuggestions([]);
+                                }}
+                              >
+                                <Text style={styles.suggestionName} numberOfLines={1}>{drug.name}</Text>
+                                {drug.generic_name && (
+                                  <Text style={styles.suggestionGeneric} numberOfLines={1}>{drug.generic_name}</Text>
+                                )}
+                                {drug.manufacturer_name && (
+                                  <Text style={styles.suggestionMfr} numberOfLines={1}>{drug.manufacturer_name}</Text>
+                                )}
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
                       </View>
                       <View style={styles.addMedRow}>
                         <TouchableOpacity
@@ -642,4 +707,26 @@ const styles = StyleSheet.create({
   medItemName: { fontSize: 13, fontWeight: "500", color: colors.slate[700] },
   medItemDetail: { fontSize: 11, color: colors.slate[400], marginTop: 2 },
   medDeleteBtn: { padding: 4 },
+  searchSpinner: { position: "absolute", right: 10, top: 10 },
+  suggestionsDropdown: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.slate[200],
+    borderRadius: 10,
+    marginTop: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  suggestionItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.slate[50],
+  },
+  suggestionName: { fontSize: 13, fontWeight: "500", color: colors.slate[800] },
+  suggestionGeneric: { fontSize: 11, color: colors.slate[500], marginTop: 1 },
+  suggestionMfr: { fontSize: 10, color: colors.slate[400], marginTop: 1 },
 });

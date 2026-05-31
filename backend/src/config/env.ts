@@ -26,6 +26,8 @@ export const env = {
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || "",
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || "",
   TWILIO_WHATSAPP_FROM: process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155238886",
+  EKA_CARE_CLIENT_ID: process.env.EKA_CARE_CLIENT_ID || "",
+  EKA_CARE_CLIENT_SECRET: process.env.EKA_CARE_CLIENT_SECRET || "",
 } as const;
 
 export function validateEnv(): void {

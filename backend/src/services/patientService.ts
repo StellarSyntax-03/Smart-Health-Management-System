@@ -1,6 +1,7 @@
 import prisma from "../config/database.js";
 import { hashPassword, comparePassword } from "./auth.js";
 import { Gender } from "../generated/prisma/client.js";
+import { codifyEntities } from "./ekaCareService.js";
 
 interface RegisterPatientInput {
   email: string;
@@ -39,6 +40,12 @@ export async function registerPatient(input: RegisterPatientInput) {
       },
       include: { patient: true },
     });
+
+    if (input.allergies?.length || input.chronicConditions?.length) {
+      codifyPatientEntities(user.patient!.id, input.allergies, input.chronicConditions).catch((err) =>
+        console.warn("Medical codification failed:", err),
+      );
+    }
 
     const { password: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
@@ -115,7 +122,35 @@ export async function updatePatientProfile(userId: string, input: UpdatePatientI
     select: PROFILE_SELECT,
   });
 
+  if (patientFields.allergies || patientFields.chronicConditions) {
+    codifyPatientEntities(user.patient!.id, patientFields.allergies, patientFields.chronicConditions).catch((err) =>
+      console.warn("Medical codification failed:", err),
+    );
+  }
+
   return updated;
+}
+
+async function codifyPatientEntities(
+  patientId: string,
+  allergies?: string[],
+  conditions?: string[],
+) {
+  const updates: Record<string, any> = {};
+
+  if (allergies?.length) {
+    updates.codifiedAllergies = await codifyEntities(allergies);
+  }
+  if (conditions?.length) {
+    updates.codifiedConditions = await codifyEntities(conditions);
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await prisma.patient.update({
+      where: { id: patientId },
+      data: updates,
+    });
+  }
 }
 
 export async function loginPatient(email: string, password: string) {

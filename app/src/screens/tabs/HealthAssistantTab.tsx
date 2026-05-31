@@ -262,16 +262,11 @@ export default function HealthAssistantTab() {
         setError("");
 
         const audioForm = new FormData();
-        if (Platform.OS === "web") {
-          const blob = await fetch(uri).then((r) => r.blob());
-          audioForm.append("audio", blob, "recording.webm");
-        } else {
-          audioForm.append("audio", {
-            uri,
-            name: "recording.m4a",
-            type: "audio/mp4",
-          } as any);
-        }
+        audioForm.append("audio", {
+          uri,
+          name: "recording.m4a",
+          type: "audio/mp4",
+        } as any);
         audioForm.append("languageCode", "hi-IN");
 
         const transcribeRes = await api.upload<ApiResponse<{ transcript: string }>>(
@@ -302,8 +297,8 @@ export default function HealthAssistantTab() {
       }
 
       await setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
 
       recorder.record();
@@ -377,8 +372,8 @@ export default function HealthAssistantTab() {
     }
     try {
       await setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
+        allowsRecording: false,
+        playsInSilentMode: true,
       });
       const player = createAudioPlayer({ uri: url });
       playerRef.current = player;

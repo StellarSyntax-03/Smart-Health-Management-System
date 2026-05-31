@@ -46,8 +46,10 @@ model Patient {
   gender            Gender
   bloodGroup        String?
   address           String?
-  allergies         String[] @default([])
-  chronicConditions String[] @default([])
+  allergies            String[] @default([])
+  chronicConditions    String[] @default([])
+  codifiedAllergies    Json?
+  codifiedConditions   Json?
 
   sosEnabled            Boolean @default(false)
   emergencyContactName  String?
@@ -144,6 +146,8 @@ model MedicalReport {
   type         ReportType
   url          String
   filePublicId String?
+  parsedData   Json?
+  ekaDocId     String?
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
