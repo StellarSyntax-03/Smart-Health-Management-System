@@ -116,7 +116,9 @@ export async function sendSOSPhotos(patientId: string, photos: Buffer[]) {
         sendWhatsAppMedia(phone, body, secureUrl).catch(() => {});
       }
     }
-  } catch {}
+  } catch (err) {
+    console.error("[SOS] Photo send error:", err);
+  }
 }
 
 export async function listAlerts(patientId: string) {

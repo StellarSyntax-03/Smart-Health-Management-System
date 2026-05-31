@@ -174,7 +174,7 @@ export async function sendPhotos(req: AuthRequest, res: Response) {
   }
 
   const buffers = files.map((f) => f.buffer);
-  sendSOSPhotos(patientId, buffers).catch(() => {});
+  sendSOSPhotos(patientId, buffers).catch((err) => console.error("[SOS] Photo upload failed:", err));
 
   res.status(202).json({ success: true });
 }
