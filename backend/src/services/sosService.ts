@@ -1,5 +1,6 @@
 import prisma from "../config/database.js";
-import { sendWhatsApp, buildSOSMessage } from "./whatsappService.js";
+import { sendWhatsApp, sendWhatsAppMedia, buildSOSMessage } from "./whatsappService.js";
+import { uploadFile } from "./cloudinaryService.js";
 
 interface SOSSetupInput {
   emergencyContactName: string;
@@ -93,6 +94,29 @@ export async function createAlert(patientId: string, latitude?: number, longitud
   const sent = results.filter((r) => r.status === "fulfilled" && r.value).length;
 
   return { alert, notificationsSent: sent, notificationsTotal: notifications.length };
+}
+
+export async function sendSOSPhotos(patientId: string, photos: Buffer[]) {
+  try {
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId },
+      include: { user: { select: { name: true } } },
+    });
+
+    if (!patient?.sosEnabled) return;
+
+    const phones = [patient.emergencyContactPhone, patient.familyDoctorPhone].filter(Boolean) as string[];
+    if (!phones.length) return;
+
+    const body = `📷 Emergency photo from ${patient.user.name}`;
+
+    for (const photo of photos) {
+      const { secureUrl } = await uploadFile(photo, "sos-photos", "image");
+      for (const phone of phones) {
+        sendWhatsAppMedia(phone, body, secureUrl).catch(() => {});
+      }
+    }
+  } catch {}
 }
 
 export async function listAlerts(patientId: string) {

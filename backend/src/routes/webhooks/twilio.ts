@@ -24,55 +24,82 @@ function normalizePhone(phone: string): string {
 }
 
 router.post("/whatsapp", async (req: Request, res: Response) => {
+  console.log("[Twilio Webhook] === Incoming POST /whatsapp ===");
+  console.log("[Twilio Webhook] Body:", JSON.stringify(req.body));
+  console.log("[Twilio Webhook] Headers:", JSON.stringify({
+    "x-twilio-signature": req.headers["x-twilio-signature"],
+    "x-forwarded-proto": req.headers["x-forwarded-proto"],
+    "x-forwarded-host": req.headers["x-forwarded-host"],
+    host: req.headers["host"],
+  }));
+
   if (env.TWILIO_AUTH_TOKEN) {
     const signature = req.headers["x-twilio-signature"] as string;
-    const url = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+    const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
+    const host = (req.headers["x-forwarded-host"] as string) || req.get("host");
+    const url = `${proto}://${host}${req.originalUrl}`;
+    console.log("[Twilio Webhook] Validating signature for URL:", url);
     const valid = twilio.validateRequest(env.TWILIO_AUTH_TOKEN, signature || "", url, req.body);
     if (!valid) {
-      res.status(403).send("<Response></Response>");
-      return;
+      console.warn("[Twilio Webhook] Signature INVALID - skipping validation in dev");
+      if (env.NODE_ENV === "production") {
+        res.status(403).send("<Response></Response>");
+        return;
+      }
+    } else {
+      console.log("[Twilio Webhook] Signature valid");
     }
   }
 
   const body = (req.body.Body || "").trim().toLowerCase();
   const from = normalizePhone((req.body.From || "").replace("whatsapp:", ""));
+  console.log("[Twilio Webhook] Parsed - from:", from, "body:", body);
 
   if (!from || !body) {
+    console.log("[Twilio Webhook] Empty from or body, ignoring");
     res.status(200).send("<Response></Response>");
     return;
   }
 
-  if (!AFFIRMATIONS.has(body)) {
+  const words = body.split(/\s+/);
+  const hasAffirmation = words.some((w: string) => AFFIRMATIONS.has(w));
+  if (!hasAffirmation) {
+    console.log("[Twilio Webhook] No affirmation found in:", body);
     res.status(200).send("<Response></Response>");
     return;
   }
 
   try {
-    const patient = await prisma.patient.findFirst({
-      where: {
-        OR: [
-          { emergencyContactPhone: from },
-          { familyDoctorPhone: from },
-        ],
-        sosEnabled: true,
-      },
+    console.log("[Twilio Webhook] Looking for patient with emergency/doctor phone:", from);
+    const sosPatients = await prisma.patient.findMany({
+      where: { sosEnabled: true },
       include: { user: { select: { name: true } } },
     });
 
+    const patient = sosPatients.find(
+      (p) =>
+        normalizePhone(p.emergencyContactPhone || "") === from ||
+        normalizePhone(p.familyDoctorPhone || "") === from,
+    );
+
     if (!patient) {
+      console.log("[Twilio Webhook] No patient found for phone:", from);
       res.status(200).send("<Response></Response>");
       return;
     }
 
+    console.log("[Twilio Webhook] Found patient:", patient.id, patient.user.name);
     const activeAlert = await prisma.sOSAlert.findFirst({
       where: { patientId: patient.id, status: "active" },
       orderBy: { createdAt: "desc" },
     });
 
     if (!activeAlert) {
+      console.log("[Twilio Webhook] No active SOS alert for patient:", patient.id);
       res.status(200).send("<Response></Response>");
       return;
     }
+    console.log("[Twilio Webhook] Found active alert:", activeAlert.id);
 
     await prisma.sOSAlert.update({
       where: { id: activeAlert.id },

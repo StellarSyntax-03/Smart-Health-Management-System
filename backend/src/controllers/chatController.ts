@@ -8,6 +8,7 @@ import {
   deleteSession,
   sendMessage,
 } from "../services/chatService.js";
+import { speechToText } from "../services/sttService.js";
 
 function getUserId(req: AuthRequest, res: Response): string | null {
   const userId = req.user?.userId;
@@ -113,6 +114,28 @@ export async function sendChatMessage(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("Send message error:", err);
     res.status(500).json({ success: false, error: "Failed to generate response" });
+  }
+}
+
+export async function transcribeAudio(req: AuthRequest, res: Response) {
+  const userId = getUserId(req, res);
+  if (!userId) return;
+
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ success: false, error: "Audio file is required" });
+    return;
+  }
+
+  const languageCode = (req.body.languageCode as string) || "hi-IN";
+  const mimeType = file.mimetype || "audio/webm";
+
+  try {
+    const transcript = await speechToText(file.buffer, languageCode, mimeType);
+    res.json({ success: true, data: { transcript } });
+  } catch (err) {
+    console.error("Transcribe error:", err);
+    res.status(500).json({ success: false, error: "Transcription failed" });
   }
 }
 

@@ -33,10 +33,9 @@ export async function getTodaySchedule(patientId: string) {
     },
   });
 
-  for (const med of medications) {
-    const slots = getTimeSlotsForFrequency(med.frequency);
-    for (const slot of slots) {
-      await prisma.medicationLog.upsert({
+  const upserts = medications.flatMap((med) =>
+    getTimeSlotsForFrequency(med.frequency).map((slot) =>
+      prisma.medicationLog.upsert({
         where: {
           medicationId_date_timeSlot: {
             medicationId: med.id,
@@ -50,9 +49,10 @@ export async function getTodaySchedule(patientId: string) {
           date: today,
           timeSlot: slot,
         },
-      });
-    }
-  }
+      }),
+    ),
+  );
+  await Promise.all(upserts);
 
   return prisma.medication.findMany({
     where: {

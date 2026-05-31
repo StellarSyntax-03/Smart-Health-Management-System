@@ -19,15 +19,36 @@ export async function sendWhatsApp(to: string, body: string): Promise<boolean> {
   const toNumber = `whatsapp:${cleaned}`;
 
   try {
-    await client.messages.create({
+    console.log(`[WhatsApp] Sending to ${toNumber} from ${env.TWILIO_WHATSAPP_FROM}`);
+    const msg = await client.messages.create({
       from: env.TWILIO_WHATSAPP_FROM,
       to: toNumber,
       body,
     });
+    console.log(`[WhatsApp] Sent! SID: ${msg.sid}, Status: ${msg.status}`);
     return true;
   } catch (err) {
-    console.warn("WhatsApp send failed, trying SMS fallback:", err);
+    console.error("[WhatsApp] Send failed:", err);
     return sendSMS(cleaned, body);
+  }
+}
+
+export async function sendWhatsAppMedia(to: string, body: string, mediaUrl: string): Promise<boolean> {
+  const client = getClient();
+  const cleaned = cleanPhone(to.replace("whatsapp:", ""));
+  const toNumber = `whatsapp:${cleaned}`;
+
+  try {
+    await client.messages.create({
+      from: env.TWILIO_WHATSAPP_FROM,
+      to: toNumber,
+      body,
+      mediaUrl: [mediaUrl],
+    });
+    return true;
+  } catch (err) {
+    console.error("[WhatsApp] Media send failed:", err);
+    return false;
   }
 }
 

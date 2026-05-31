@@ -8,6 +8,7 @@ import {
   setupSOS,
   disableSOS,
   getSOSConfig,
+  sendSOSPhotos,
 } from "../services/sosService.js";
 import prisma from "../config/database.js";
 
@@ -157,4 +158,23 @@ export async function active(req: AuthRequest, res: Response) {
   } catch {
     res.status(500).json({ error: "Failed to fetch active SOS alert" });
   }
+}
+
+export async function sendPhotos(req: AuthRequest, res: Response) {
+  const patientId = await resolvePatientId(req.user!.userId);
+  if (!patientId) {
+    res.status(404).json({ error: "Patient not found" });
+    return;
+  }
+
+  const files = req.files as Express.Multer.File[] | undefined;
+  if (!files?.length) {
+    res.status(400).json({ error: "No photos provided" });
+    return;
+  }
+
+  const buffers = files.map((f) => f.buffer);
+  sendSOSPhotos(patientId, buffers).catch(() => {});
+
+  res.status(202).json({ success: true });
 }
