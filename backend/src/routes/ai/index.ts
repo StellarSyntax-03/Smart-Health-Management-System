@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../../middleware/auth.js";
-import { uploadImage } from "../../middleware/upload.js";
+import { uploadImage, uploadAudio } from "../../middleware/upload.js";
 import {
   createChatSession,
   listChatSessions,
   getChatMessages,
   sendChatMessage,
   deleteChatSession,
+  transcribeAudio,
 } from "../../controllers/chatController.js";
 
 const router = Router();
@@ -16,6 +17,7 @@ router.get("/sessions", authenticate, authorize("patient"), listChatSessions);
 router.get("/sessions/:id/messages", authenticate, authorize("patient"), getChatMessages);
 router.post("/sessions/:id/messages", authenticate, authorize("patient"), uploadImage, sendChatMessage);
 router.delete("/sessions/:id", authenticate, authorize("patient"), deleteChatSession);
+router.post("/transcribe", authenticate, authorize("patient"), uploadAudio, transcribeAudio);
 
 router.get("/", (_req, res) => {
   res.json({ success: true, message: "AI routes ready" });

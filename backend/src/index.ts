@@ -13,8 +13,10 @@ validateEnv();
 
 const app = express();
 
+app.use("/api/webhooks/twilio", express.urlencoded({ extended: false }), twilioWebhook);
+
 app.use(cors({
-  origin: env.FRONTEND_URL,
+  origin: [env.FRONTEND_URL, "http://localhost:8081"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -26,7 +28,6 @@ app.use(requestLogger);
 app.use("/api/patient", patientRoutes);
 app.use("/api/doctor", doctorRoutes);
 app.use("/api/ai", aiRoutes);
-app.use("/api/webhooks/twilio", twilioWebhook);
 
 app.get("/api/health", (_req, res) => {
   res.json({
