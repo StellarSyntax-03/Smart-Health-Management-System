@@ -127,14 +127,12 @@ export default function LoginScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           </View>
 
-          {isPatient && (
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-                <Text style={styles.footerLink}>Sign Up</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate(isPatient ? "Register" : "DoctorRegister")}>
+              <Text style={[styles.footerLink, { color: accentColor }]}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.roleSwitch}>
             <TouchableOpacity

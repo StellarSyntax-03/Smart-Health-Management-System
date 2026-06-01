@@ -8,6 +8,7 @@ import medicationRoutes from "./medications.js";
 import sosRoutes from "./sos.js";
 import drugRoutes from "./drugs.js";
 import assessmentRoutes from "./assessment.js";
+import connectionRoutes from "./connections.js";
 import { codifyProfile } from "../../controllers/ekaCareController.js";
 
 const router = Router();
@@ -24,6 +25,7 @@ router.use("/medications", medicationRoutes);
 router.use("/sos", sosRoutes);
 router.use("/drugs", drugRoutes);
 router.use("/assessment", assessmentRoutes);
+router.use("/connections", connectionRoutes);
 router.post("/codify", authenticate, authorize("patient"), codifyProfile);
 
 export default router;

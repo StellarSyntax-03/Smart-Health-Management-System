@@ -21,8 +21,9 @@ import ReportsTab from "./tabs/ReportsTab";
 import HealthAssistantTab from "./tabs/HealthAssistantTab";
 import SOSTab from "./tabs/SOSTab";
 import SymptomCheckerTab from "./tabs/SymptomCheckerTab";
+import DoctorRequestsTab from "./tabs/DoctorRequestsTab";
 
-type TabKey = "home" | "profile" | "vitals" | "medications" | "prescriptions" | "reports" | "chat" | "symptoms" | "sos";
+type TabKey = "home" | "profile" | "vitals" | "medications" | "prescriptions" | "reports" | "chat" | "symptoms" | "sos" | "doctors";
 
 const TABS: { key: TabKey; label: string; icon: string; color?: string }[] = [
   { key: "home", label: "Home", icon: "home" },
@@ -32,6 +33,7 @@ const TABS: { key: TabKey; label: string; icon: string; color?: string }[] = [
   { key: "reports", label: "Reports", icon: "folder" },
   { key: "chat", label: "Health Assistant", icon: "chatbubbles" },
   { key: "symptoms", label: "Symptoms", icon: "fitness" },
+  { key: "doctors", label: "Doctors", icon: "medkit" },
   { key: "sos", label: "SOS", icon: "alert-circle", color: "#ef4444" },
 ];
 
@@ -40,6 +42,7 @@ export default function PatientDashboardScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>("home");
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [pendingDoctorCount, setPendingDoctorCount] = useState(0);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -51,9 +54,17 @@ export default function PatientDashboardScreen() {
     }
   }, []);
 
+  const fetchPendingCount = useCallback(async () => {
+    try {
+      const res = await api.get<ApiResponse<{ count: number }>>("/patient/connections/requests/count");
+      if (res.success && res.data) setPendingDoctorCount(res.data.count);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+    fetchPendingCount();
+  }, [fetchProfile, fetchPendingCount]);
 
   const greeting = (() => {
     const hour = new Date().getHours();
@@ -91,6 +102,7 @@ export default function PatientDashboardScreen() {
       case "reports": return <ReportsTab />;
       case "chat": return <HealthAssistantTab />;
       case "symptoms": return <SymptomCheckerTab />;
+      case "doctors": return <DoctorRequestsTab onCountChange={fetchPendingCount} />;
       case "sos": return <SOSTab />;
       default: return null;
     }
@@ -151,6 +163,11 @@ export default function PatientDashboardScreen() {
                 >
                   {tab.label}
                 </Text>
+                {tab.key === "doctors" && pendingDoctorCount > 0 && !isActive && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{pendingDoctorCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -268,5 +285,20 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  badge: {
+    backgroundColor: colors.red[500],
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    marginLeft: 2,
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: "700",
   },
 });
