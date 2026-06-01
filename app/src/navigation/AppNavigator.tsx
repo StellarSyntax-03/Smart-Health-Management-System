@@ -5,7 +5,10 @@ import { useAuth } from "../context/auth";
 import { colors } from "../lib/colors";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
+import DoctorRegisterScreen from "../screens/DoctorRegisterScreen";
 import PatientDashboardScreen from "../screens/PatientDashboardScreen";
+import DoctorDashboardScreen from "../screens/DoctorDashboardScreen";
+import PatientDetailScreen from "../screens/PatientDetailScreen";
 import { AuthStackParamList, AppStackParamList } from "./types";
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -16,14 +19,23 @@ function AuthNavigator() {
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="Login" component={LoginScreen} initialParams={{ role: "patient" }} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
+      <AuthStack.Screen name="DoctorRegister" component={DoctorRegisterScreen} />
     </AuthStack.Navigator>
   );
 }
 
 function AppNavigator() {
+  const { user } = useAuth();
   return (
     <AppStack.Navigator screenOptions={{ headerShown: false }}>
-      <AppStack.Screen name="PatientDashboard" component={PatientDashboardScreen} />
+      {user?.role === "doctor" ? (
+        <>
+          <AppStack.Screen name="DoctorDashboard" component={DoctorDashboardScreen} />
+          <AppStack.Screen name="PatientDetail" component={PatientDetailScreen} />
+        </>
+      ) : (
+        <AppStack.Screen name="PatientDashboard" component={PatientDashboardScreen} />
+      )}
     </AppStack.Navigator>
   );
 }

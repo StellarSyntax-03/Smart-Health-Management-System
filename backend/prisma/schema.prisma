@@ -64,6 +64,7 @@ model Patient {
   vitals        Vital[]
   chatSessions  ChatSession[]
   sosAlerts     SOSAlert[]
+  doctors       DoctorPatient[]
 
   @@map("patients")
 }
@@ -73,11 +74,33 @@ model Doctor {
   userId         String  @unique
   specialization String?
   licenseNumber  String?
+  approved       Boolean @default(false)
+  qualification  String?
+  experience     Int?
+  clinicName     String?
+  clinicAddress  String?
+  bio            String?
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   prescriptions Prescription[]
+  patients      DoctorPatient[]
 
   @@map("doctors")
+}
+
+model DoctorPatient {
+  id        String   @id @default(cuid())
+  doctorId  String
+  patientId String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, patientId])
+  @@map("doctor_patients")
 }
 
 model MedicalRecord {
